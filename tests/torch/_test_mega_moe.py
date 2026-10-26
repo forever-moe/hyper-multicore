@@ -202,13 +202,17 @@ def _copy_common_weights_to_mega(
     up_weight = _local_tensor(common_moe.w3)
     down_weight = _local_tensor(common_moe.w2)
     with torch.no_grad():
-        mega.gate_up_weight.copy_(
-            torch.cat(
-                (gate_weight.transpose(1, 2), up_weight.transpose(1, 2)),
-                dim=-1,
+        if mega.expert_weight_layout == "EOI":
+            mega.gate_up_weight.copy_(torch.cat((gate_weight, up_weight), dim=1))
+            mega.down_weight.copy_(down_weight)
+        else:
+            mega.gate_up_weight.copy_(
+                torch.cat(
+                    (gate_weight.transpose(1, 2), up_weight.transpose(1, 2)),
+                    dim=-1,
+                )
             )
-        )
-        mega.down_weight.copy_(down_weight.transpose(1, 2))
+            mega.down_weight.copy_(down_weight.transpose(1, 2))
 
 
 def new_layers(
@@ -217,6 +221,7 @@ def new_layers(
     initial_capacity_factor: float | None = None,
     capacity_growth_factor: float | None = None,
     dispatch_mode: str | None = None,
+    expert_weight_layout: str = "EIO",
 ) -> tuple[MegaMoeExperts, torch.nn.Module]:
     """Construct parameter-aligned MegaMoe and common expert layers.
 
@@ -225,6 +230,7 @@ def new_layers(
         initial_capacity_factor: Optional initial push receive factor.
         dispatch_mode: MegaMoe dispatch transport.
         capacity_growth_factor: Optional push growth multiplier.
+        expert_weight_layout: Public expert parameter layout.
 
     Returns:
         MegaMoe and common expert modules with identical local parameters.
@@ -240,6 +246,7 @@ def new_layers(
         initial_capacity_factor=initial_capacity_factor if mode == "push" else None,
         capacity_growth_factor=capacity_growth_factor if mode == "push" else None,
         dispatch_mode=mode,
+        expert_weight_layout=expert_weight_layout,
         ep_size=shape.ep_size,
         ep_group=dist.group.WORLD,
     ).to(device=DEVICE, dtype=torch.bfloat16)
@@ -333,6 +340,13 @@ def expert_weight_gradients(
 ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
     """Return expert gradients in MegaMoe's packed local layout."""
     if isinstance(layer, MegaMoeExperts):
+        if layer.expert_weight_layout == "EOI":
+            gate_up_grad = layer.gate_up_weight.grad
+            down_grad = layer.down_weight.grad
+            return (
+                None if gate_up_grad is None else gate_up_grad.transpose(1, 2),
+                None if down_grad is None else down_grad.transpose(1, 2),
+            )
         return layer.gate_up_weight.grad, layer.down_weight.grad
     if not isinstance(layer, TorchExperts):
         raise TypeError(f"unsupported expert layer type {type(layer).__name__}.")
@@ -358,6 +372,11 @@ def expert_weights(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Return expert weights in MegaMoe's packed local layout."""
     if isinstance(layer, MegaMoeExperts):
+        if layer.expert_weight_layout == "EOI":
+            return (
+                layer.gate_up_weight.transpose(1, 2),
+                layer.down_weight.transpose(1, 2),
+            )
         return layer.gate_up_weight, layer.down_weight
     if not isinstance(layer, TorchExperts):
         raise TypeError(f"unsupported expert layer type {type(layer).__name__}.")
@@ -443,7 +462,7 @@ def assert_results_close(common_result: _RunResult, mega_result: _RunResult) -> 
 
 
 def test_mega_moe_level0_balanced() -> None:
-    """Compare routed-expert F+B and optimizer updates with common MoE."""
+    """Compare EIO/EOI routed-expert F+B and optimizer updates with common MoE."""
     shape = MoeShape()
     hidden_states, grad_output = make_data(shape)
     mega, common_moe = new_layers(shape)
@@ -486,7 +505,9 @@ def test_mega_moe_level0_balanced() -> None:
     finally:
         mega.close()
 
-    bounded, bounded_common = new_layers(shape, initial_capacity_factor=1.5)
+    # Reuse the bounded-capacity scenario to cover TorchTitan-native EOI storage
+    # in the same process group as the default EIO routing cases.
+    bounded, bounded_common = new_layers(shape, initial_capacity_factor=1.5, expert_weight_layout="EOI")
     topk_ids, topk_weights, tokens_per_expert = make_balanced_route(shape)
     try:
         bounded_common_result = run_layer(
