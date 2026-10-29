@@ -1,8 +1,7 @@
 include README.md LICENSE Third_Party_Open_Source_Software_Notice
 include build.sh requirements.txt
-include .clang-format .codespellrc .pylintrc .gitattributes
+include .clang-format .codespellrc .pylintrc .gitattributes .pre-commit-config.yaml .markdownlint.jsonc
 recursive-include hyper_multicore *.py *.sh *.bash *.cpp *.cc *.h *.hpp *.cmake CMakeLists.txt CPPLINT.cfg *.patch *.json *.ini *.md *.txt
-recursive-include hyper_multicore .gitkeep
 recursive-include scripts *.py *.sh *.bash
 recursive-include tests *.py *.cpp *.h *.hpp *.md
 recursive-include examples *.py *.md *.sh

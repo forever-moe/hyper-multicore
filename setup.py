@@ -21,14 +21,26 @@ import runpy
 import shutil
 import sys
 
+from packaging.requirements import Requirement
 from setuptools import Distribution, find_packages, setup
 from setuptools.command.build_py import build_py
 
 ROOT = Path(__file__).resolve().parent
-COMPONENT_VERSION = "0.1.0.dev0"
+BUILD_HELPERS = runpy.run_path(str(ROOT / "hyper_multicore/_build/artifacts.py"))
+COMPONENT_VERSION = BUILD_HELPERS["COMPONENT_VERSION"]
 payload = os.environ.get("HYPER_MULTICORE_NATIVE_OUTPUT_ROOT", "").strip()
 info = (json.loads((Path(payload) / "build_info.json").read_text(encoding="utf-8"))
         if payload and "sdist" not in sys.argv else None)
+
+
+def get_install_requires() -> list[str]:
+    """Read runtime requirements and pin Torch to an explicitly selected native build."""
+    requirements = [line.strip() for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+                    if line.strip() and not line.strip().startswith("#")]
+    if info is not None:
+        requirements = [f"torch=={info['torch_version']}" if Requirement(value).name.lower() == "torch" else value
+                        for value in requirements]
+    return requirements
 
 
 class BuildPy(build_py):
@@ -39,8 +51,7 @@ class BuildPy(build_py):
         if info is None and "editable_wheel" not in sys.argv:
             raise RuntimeError("Native payload required for wheels; run bash build.sh. Use editable for Host UT.")
         if info is not None:
-            helper = runpy.run_path(str(ROOT / "hyper_multicore/_build/artifacts.py"))
-            helper["validate_payload"](Path(payload), info)
+            BUILD_HELPERS["validate_payload"](Path(payload), info)
             # Removed modules and native libraries must not survive an incremental wheel build.
             package_build = Path(self.build_lib) / "hyper_multicore"
             if package_build.exists():
@@ -68,7 +79,7 @@ setup(
     license="Apache-2.0",
     python_requires=">=3.10,<3.13",
     packages=find_packages(include=["hyper_multicore", "hyper_multicore.*"]),
-    install_requires=["numpy>=1.26,<2", f"torch=={info['torch_version']}" if info else "torch"],
+    install_requires=get_install_requires(),
     scripts=["scripts/hyper_multicore_set_env.bash"],
     include_package_data=False,
     package_data={"hyper_multicore": ["ops/runtime/*.h", "ops/runtime/*.hpp"]},

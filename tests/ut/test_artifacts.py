@@ -17,8 +17,10 @@
 from importlib import metadata
 import hashlib
 import json
+import os
 from pathlib import Path
 import runpy
+import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -40,6 +42,41 @@ class TestArtifacts(unittest.TestCase):
         for value in ("", "unknown"):
             with self.assertRaises(ValueError):
                 HELPER["artifact_version"](value)
+
+    def test_setup_reads_requirements_and_shared_component_version(self):
+        """Source metadata follows requirements; native metadata preserves the exact Torch build."""
+        root = Path(__file__).absolute().parents[2]
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / "setup.py").write_text((root / "setup.py").read_text(), encoding="utf-8")
+            (project / "README.md").write_text("# Fixture\n", encoding="utf-8")
+            (project / "requirements.txt").write_text(
+                "# Runtime dependencies\ntorch\n\nnumpy>=1.26.4,<2\n", encoding="utf-8",
+            )
+            helper = project / "hyper_multicore/_build/artifacts.py"
+            helper.parent.mkdir(parents=True)
+            source = (root / "hyper_multicore/_build/artifacts.py").read_text()
+            version_line = 'COMPONENT_VERSION = "' + HELPER["COMPONENT_VERSION"] + '"'
+            self.assertIn(version_line, source)
+            helper.write_text(source.replace(version_line, 'COMPONENT_VERSION = "7.8.9.dev0"'), encoding="utf-8")
+            payload = project / "payload"
+            payload.mkdir()
+            (payload / "build_info.json").write_text(json.dumps({
+                "artifact_version": "7.8.9.dev0+pt.2.12.0", "torch_version": "2.12.0+cpu",
+            }), encoding="utf-8")
+            for native in (False, True):
+                with self.subTest(native=native), patch.dict(
+                    os.environ, {"HYPER_MULTICORE_NATIVE_OUTPUT_ROOT": str(payload) if native else ""},
+                ), patch.object(sys, "argv", [str(project / "setup.py"), "egg_info"]), patch(
+                    "setuptools.setup",
+                ) as setup:
+                    runpy.run_path(str(project / "setup.py"))
+                    setup_metadata = setup.call_args.kwargs
+                    self.assertEqual(setup_metadata["version"], "7.8.9.dev0+pt.2.12.0" if native else "7.8.9.dev0")
+                    self.assertEqual(setup_metadata["install_requires"], [
+                        "torch==2.12.0+cpu" if native else "torch", "numpy>=1.26.4,<2",
+                    ])
+                    self.assertNotIn("extras_require", setup_metadata)
 
     def test_missing_pta_is_not_guessed(self):
         """Native identity creation must fail when torch-npu is not installed."""
@@ -89,7 +126,6 @@ class TestArtifacts(unittest.TestCase):
 
     def test_native_environment_mismatch_is_rejected(self):
         """Wrong Torch, PTA, Python, ABI or custom PTA binary must fail before loading."""
-        import sys
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "lib").mkdir()
