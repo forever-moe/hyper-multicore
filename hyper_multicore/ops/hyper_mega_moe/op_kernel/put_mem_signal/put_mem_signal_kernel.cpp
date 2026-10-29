@@ -21,9 +21,9 @@
 
 using namespace AscendC;
 
-namespace shmem_data_plane = hyper_parallel::multicore::shmem::data_plane;
+namespace shmem_data_plane = hyper_multicore::shmem::data_plane;
 
-namespace hyper_parallel::multicore {
+namespace hyper_multicore {
 
 template <typename T>
 __aicore__ inline void CopyGmSingleValueToUb(GM_ADDR gm_addr, T *result) {
@@ -158,13 +158,13 @@ class PutMemSignalKernel {
   uint32_t aiv_num_ = 0;
 };
 
-}  // namespace hyper_parallel::multicore
+}  // namespace hyper_multicore
 
 extern "C" inline __aicore__ void put_mem_signal_kernel(GM_ADDR target, int64_t target_offset, GM_ADDR src,
                                                         int64_t src_offset, int64_t size, GM_ADDR signal,
                                                         int64_t signal_offset, int64_t signal_value, GM_ADDR workspace,
                                                         int64_t signal_op, int64_t target_pe, bool non_blocking) {
-  hyper_parallel::multicore::PutMemSignalKernel<DTYPE_DISPATCH_TARGET> op;
+  hyper_multicore::PutMemSignalKernel<DTYPE_DISPATCH_TARGET> op;
   op.Init(target, target_offset, src, src_offset, size, signal, signal_offset, signal_value, signal_op, target_pe,
           non_blocking, workspace);
   op.Process();

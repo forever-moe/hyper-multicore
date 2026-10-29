@@ -15,7 +15,7 @@
 #include "aclnn/aclnn_base.h"
 #include "aclnn_util.h"
 
-namespace hyper_parallel::multicore {
+namespace hyper_multicore {
 
 template <typename T>
 struct HyperMegaMoeGradParamsBase {
@@ -26,7 +26,7 @@ struct HyperMegaMoeGradParamsBase {
 };
 using HyperMegaMoeGradParams = HyperMegaMoeGradParamsBase<aclTensor>;
 
-}  // namespace hyper_parallel::multicore
+}  // namespace hyper_multicore
 
 #ifdef __cplusplus
 extern "C" {

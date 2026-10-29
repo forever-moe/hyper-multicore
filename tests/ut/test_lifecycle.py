@@ -23,10 +23,10 @@ from unittest.mock import Mock, patch
 from torch import Tensor, ones
 from torch.autograd import Function
 
-from hyper_parallel.core.multicore import _automatic, _collective
-from hyper_parallel.core.multicore.modules import module as module_api
-from hyper_parallel.core.multicore.modules.mega_moe.function import _release_completed_graph
-from hyper_parallel.core.multicore.modules.mega_moe.workspace import MegaMoeWorkspace
+from hyper_multicore import _automatic, _collective
+from hyper_multicore.modules import module as module_api
+from hyper_multicore.modules.mega_moe.function import _release_completed_graph
+from hyper_multicore.modules.mega_moe.workspace import MegaMoeWorkspace
 from tests.common.mark_utils import arg_mark
 
 # pylint: disable=protected-access
@@ -223,7 +223,7 @@ class TestLifecycle(unittest.TestCase):
         output.sum().backward()
         self.assertTrue(workspace.can_close())
         workspace.expert_buffer, workspace.routed_buffer = Mock(), Mock()
-        with patch("hyper_parallel.core.multicore.modules.mega_moe.workspace.shmem.free",
+        with patch("hyper_multicore.modules.mega_moe.workspace.shmem.free",
                    side_effect=[None, RuntimeError("free failed"), None]) as free:
             with self.assertRaisesRegex(RuntimeError, "free failed"):
                 workspace._free_symmetric_tensors()
@@ -258,8 +258,8 @@ class TestLifecycle(unittest.TestCase):
         )
         workspace.gmm_workspace.untyped_storage.return_value.resize_.side_effect = [RuntimeError("busy"), None]
         with (
-            patch("hyper_parallel.core.multicore.modules.mega_moe.workspace.torch.npu", create=True),
-            patch("hyper_parallel.core.multicore.modules.mega_moe.workspace.shmem.host_barrier") as barrier,
+            patch("hyper_multicore.modules.mega_moe.workspace.torch.npu", create=True),
+            patch("hyper_multicore.modules.mega_moe.workspace.shmem.host_barrier") as barrier,
             patch.object(_automatic._CLEANUP, "root_group", object()),
             patch.object(_collective.dist, "is_initialized", return_value=True),
             patch.object(_collective.dist, "get_world_size", return_value=2),

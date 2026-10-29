@@ -18,14 +18,14 @@ import math
 import struct
 import unittest
 
-from hyper_parallel.core.multicore.modules.mega_moe.backward.graph import (
+from hyper_multicore.modules.mega_moe.backward.graph import (
     build_backward_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.graph import (
+from hyper_multicore.modules.mega_moe.forward.graph import (
     build_forward_graph,
 )
-from hyper_parallel.core.multicore.scheduler.builder import build_runtime_config
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue, TaskType
+from hyper_multicore.scheduler.builder import build_runtime_config
+from hyper_multicore.scheduler.config import TaskSplitValue, TaskType
 
 
 class TestSwiGLUClamp(unittest.TestCase):

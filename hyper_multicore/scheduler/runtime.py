@@ -18,7 +18,7 @@ import ctypes
 import struct
 from functools import lru_cache
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     ATOMIC_ADD_VALUE_LEN,
     GROUP_LIST_CACHE_LINE_BYTES,
     MIN_EVENT_CAPACITY,

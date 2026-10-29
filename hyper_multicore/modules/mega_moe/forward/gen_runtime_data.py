@@ -34,16 +34,16 @@ import argparse
 from dataclasses import dataclass
 import os
 
-from hyper_parallel.core.multicore.modules.mega_moe.forward.graph import (
+from hyper_multicore.modules.mega_moe.forward.graph import (
     build_forward_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.tiling_tables import (
+from hyper_multicore.modules.mega_moe.forward.tiling_tables import (
     get_down_proj_tiling_bytes,
     get_swiglu_tiling_bytes,
     get_up_proj_tiling_bytes,
 )
-from hyper_parallel.core.multicore.scheduler.builder import allocate_graph_config
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.builder import allocate_graph_config
+from hyper_multicore.scheduler.config import (
     RuntimeConfigC,
     TaskSplitValue,
     configure_ready_handshake,
@@ -51,10 +51,10 @@ from hyper_parallel.core.multicore.scheduler.config import (
     init_task_split_value,
     validate_runtime_config,
 )
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph
-from hyper_parallel.core.multicore.scheduler.runtime import serialize_runtime_config
-from hyper_parallel.core.multicore.scheduler.scheduler import revise_task_queue
-from hyper_parallel.core.multicore.tasks.utils import add_dynamic_data, add_terminate
+from hyper_multicore.scheduler.graph import ComputeGraph
+from hyper_multicore.scheduler.runtime import serialize_runtime_config
+from hyper_multicore.scheduler.scheduler import revise_task_queue
+from hyper_multicore.tasks.utils import add_dynamic_data, add_terminate
 
 
 @dataclass(frozen=True)

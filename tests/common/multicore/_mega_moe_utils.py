@@ -26,9 +26,9 @@ import torch
 import torch.distributed as dist
 import torch_npu
 
-from hyper_parallel.core.multicore import shmem
-from hyper_parallel.core.multicore._loader import get_multicore_paths
-from tests.torch.multicore._evidence_helpers import source_revision
+from hyper_multicore import shmem
+from hyper_multicore._loader import get_multicore_paths
+from tests.common.multicore._evidence_helpers import source_revision
 from tests.common.port_utils import allocate_port
 
 
@@ -37,7 +37,7 @@ def start_shmem_lifetime() -> None:
     dist.barrier()
     endpoint = [f"tcp://127.0.0.1:{allocate_port()}" if dist.get_rank() == 0 else None]
     dist.broadcast_object_list(endpoint, src=0)
-    os.environ["HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT"] = endpoint[0]
+    os.environ["HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT"] = endpoint[0]
 
 
 def memory_sample() -> dict[str, int]:
@@ -80,15 +80,15 @@ def environment_identity() -> dict:
         for path in version_files if path.is_file()
     }
     native_files = [adapter, *vendor.rglob("*.so"), *vendor.rglob("*.o")]
-    binding_spec = importlib.util.find_spec("hyper_parallel_shmem_torch")
+    binding_spec = importlib.util.find_spec("hyper_multicore_shmem_torch")
     if binding_spec is None or binding_spec.origin is None:
-        raise RuntimeError("hyper_parallel_shmem_torch native module is not importable.")
+        raise RuntimeError("hyper_multicore_shmem_torch native module is not importable.")
     native_files.extend(Path(binding_spec.origin).parents[2].rglob("*.so"))
     return {
         **source_revision(root),
         "worker_sha256": {
             path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in Path(__file__).parent.glob("*mega_moe*.py")
+            for path in (root / "tests/torch").glob("*mega_moe*.py")
         },
         "python": platform.python_version(),
         "torch": torch.__version__,

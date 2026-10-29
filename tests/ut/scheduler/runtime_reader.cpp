@@ -32,8 +32,8 @@ template <HardEvent event>
 inline void WaitFlag(uint32_t) {}
 }  // namespace AscendC
 using AscendC::GetTPipePtr;
-#include "hyper_parallel/core/multicore/ops/runtime/runtime_config.hpp"
-#include "hyper_parallel/core/multicore/ops/runtime/runtime_storage_bounds_host.h"
+#include "hyper_multicore/ops/runtime/runtime_config.hpp"
+#include "hyper_multicore/ops/runtime/runtime_storage_bounds_host.h"
 
 namespace Runtime = MulticoreRuntime;
 

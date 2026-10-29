@@ -19,7 +19,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Protocol
 
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchContext
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchContext
 
 
 class DiagnosticSession(Protocol):

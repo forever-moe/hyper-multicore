@@ -23,10 +23,10 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import torch
 
-from hyper_parallel.core.multicore import _automatic, _collective
-from hyper_parallel.core.multicore.modules.mega_moe import module as mega_moe_module
-from hyper_parallel.core.multicore.modules.mega_moe.module import MegaMoeExperts
-from hyper_parallel.core.multicore.modules.mega_moe.spec import MegaMoeSpec
+from hyper_multicore import _automatic, _collective
+from hyper_multicore.modules.mega_moe import module as mega_moe_module
+from hyper_multicore.modules.mega_moe.module import MegaMoeExperts
+from hyper_multicore.modules.mega_moe.spec import MegaMoeSpec
 from tests.common.mark_utils import arg_mark
 
 

@@ -24,12 +24,12 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from hyper_parallel.core.multicore.diagnostics.common.session import _reset_active_session_for_test
-from hyper_parallel.core.multicore.diagnostics import DiagnosticAction, schedule
-from hyper_parallel.core.multicore.diagnostics.profiler import api as torch_profiler
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments
-from hyper_parallel.core.multicore.diagnostics.common.session import _get_active_session
-from hyper_parallel.core.multicore.torch import ops as multicore_adapter
+from hyper_multicore.diagnostics.common.session import _reset_active_session_for_test
+from hyper_multicore.diagnostics import DiagnosticAction, schedule
+from hyper_multicore.diagnostics.profiler import api as torch_profiler
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments
+from hyper_multicore.diagnostics.common.session import _get_active_session
+from hyper_multicore.torch import ops as multicore_adapter
 from tests.common.mark_utils import arg_mark
 
 

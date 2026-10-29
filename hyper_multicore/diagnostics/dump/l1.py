@@ -24,8 +24,8 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import operator_diagnostic_name
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.diagnostics.common.graph import operator_diagnostic_name
+from hyper_multicore.scheduler.config import (
     RuntimeConfigC,
     TaskAiCoreType,
     TensorDescC,

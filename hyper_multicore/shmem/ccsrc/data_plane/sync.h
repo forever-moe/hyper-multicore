@@ -14,7 +14,7 @@
 
 #include "cann/device.h"
 
-namespace hyper_parallel::multicore::shmem::data_plane {
+namespace hyper_multicore::shmem::data_plane {
 
 using cann::CompareOp;
 using cann::SignalOp;
@@ -81,4 +81,4 @@ __aicore__ inline int32_t signal_wait(__gm__ int32_t *local_signal, CompareOp co
  */
 __aicore__ inline void barrier() { cann::device::barrier(); }
 
-}  // namespace hyper_parallel::multicore::shmem::data_plane
+}  // namespace hyper_multicore::shmem::data_plane

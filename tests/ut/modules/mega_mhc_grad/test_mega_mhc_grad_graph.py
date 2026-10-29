@@ -17,8 +17,8 @@
 import unittest
 from unittest.mock import patch
 
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.function import _resolve_core_counts
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.graph import (
+from hyper_multicore.modules.mega_mhc_grad.function import _resolve_core_counts
+from hyper_multicore.modules.mega_mhc_grad.graph import (
     DEFAULT_GRAD_TOKEN_TILE,
     NATIVE_GRAD_CUBE_TILE,
     build_event_layout,
@@ -26,8 +26,8 @@ from hyper_parallel.core.multicore.modules.mega_mhc_grad.graph import (
     order_vector_tasks_by_stage,
     resolve_grad_token_tile,
 )
-from hyper_parallel.core.multicore.scheduler.builder import build_runtime_config
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.builder import build_runtime_config
+from hyper_multicore.scheduler.config import (
     ATOMIC_ADD_VALUE_LEN,
     FAST_DEPENDENCY_POLL_INTERVAL_US,
     MIN_EVENT_CAPACITY,
@@ -47,7 +47,7 @@ class TestMegaMhcGradGraph(unittest.TestCase):
 
     @arg_mark(plat_marks=["cpu_linux", "cpu_macos"], level_mark="level0",
               card_mark="allcards", essential_mark="essential")
-    @patch("hyper_parallel.core.multicore.modules.mega_mhc_grad.function.torch.npu.get_device_limit")
+    @patch("hyper_multicore.modules.mega_mhc_grad.function.torch.npu.get_device_limit")
     def test_resolve_core_counts_uses_device_vector_count(self, mock_get_device_limit) -> None:
         """Feature: HyperMegaMhcGrad device core discovery.
 
@@ -66,7 +66,7 @@ class TestMegaMhcGradGraph(unittest.TestCase):
 
     @arg_mark(plat_marks=["cpu_linux", "cpu_macos"], level_mark="level0",
               card_mark="allcards", essential_mark="essential")
-    @patch("hyper_parallel.core.multicore.modules.mega_mhc_grad.function.torch.npu.get_device_limit")
+    @patch("hyper_multicore.modules.mega_mhc_grad.function.torch.npu.get_device_limit")
     def test_resolve_core_counts_rejects_incompatible_mixed_ratio(self, mock_get_device_limit) -> None:
         """Feature: HyperMegaMhcGrad mixed-kernel core ratio.
 

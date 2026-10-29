@@ -111,13 +111,13 @@ NineTensorRefs mega_mhc_grad_meta(const at::Tensor &, const at::Tensor &, const 
 
 }  // namespace
 
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) {
   m.impl("cann_mhc_pre_sinkhorn", &cann_mhc_pre_sinkhorn_npu);
   m.impl("mega_mhc", &mega_mhc_npu);
   m.impl("mega_mhc_grad", &mega_mhc_grad_npu);
 }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) {
   m.impl("cann_mhc_pre_sinkhorn", &cann_mhc_pre_sinkhorn_meta);
   m.impl("mega_mhc", &mega_mhc_meta);
   m.impl("mega_mhc_grad", &mega_mhc_grad_meta);

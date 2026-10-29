@@ -22,8 +22,8 @@ from functools import partial
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
+from hyper_multicore.scheduler.config import (
     EVENT_INVALID_ID,
     INVALID_PROFILE_OWNER_ID,
     TaskAiCoreType,
@@ -32,7 +32,7 @@ from hyper_parallel.core.multicore.scheduler.config import (
     RuntimeConfigC,
     NUM_WORKERS_VECTOR,
 )
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
 
 from .diagnostics import (
     MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES,

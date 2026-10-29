@@ -31,11 +31,8 @@ import torch
 import torch.distributed as dist
 import torch_npu
 
-from hyper_parallel import init_device_mesh
-from hyper_parallel.core.dtensor.dtensor import DTensor
-from hyper_parallel.core.expert_parallel.expert_parallel import ExpertParallel
-from hyper_parallel.core.multicore import MegaMoeExperts
-from hyper_parallel.components.modules.moe import GroupedExperts
+from hyper_multicore import MegaMoeExperts
+from tests.common.multicore.moe_reference import TorchExperts
 
 _RTOL = 2e-2
 _ATOL = 2e-3
@@ -179,31 +176,25 @@ def _make_fixed_route(
 
 def _local_tensor(tensor: torch.Tensor) -> torch.Tensor:
     """Return the local value of a plain tensor or DTensor."""
-    return tensor.to_local() if isinstance(tensor, DTensor) else tensor
+    return tensor
 
 
-def new_common_moe(shape: MoeShape) -> GroupedExperts:
-    """Build common grouped experts and apply standard expert parallelism."""
+def new_common_moe(shape: MoeShape) -> TorchExperts:
+    """Build the independent, owner-sharded Torch correctness oracle."""
     torch.manual_seed(2026)
     torch.npu.manual_seed(2026)
-    common_moe = GroupedExperts(
+    common_moe = TorchExperts(
         dim=shape.hidden_size,
         hidden_dim=shape.intermediate_size,
         num_experts=shape.num_experts,
-        use_grouped_mm=True,
+        group=dist.group.WORLD,
     )
     common_moe = _move_to_test_device(common_moe)
-    ep_mesh = init_device_mesh(
-        device_type="npu",
-        mesh_shape=(shape.ep_size,),
-        mesh_dim_names=("ep",),
-    )
-    ExpertParallel().apply(common_moe, ep_mesh)
     return common_moe
 
 
 def _copy_common_weights_to_mega(
-    common_moe: GroupedExperts,
+    common_moe: TorchExperts,
     mega: MegaMoeExperts,
 ) -> None:
     """Copy the local common-MoE expert shard into MegaMoe's packed layout."""
@@ -276,7 +267,7 @@ def make_data(shape: MoeShape) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def forward_layer(
-    layer: MegaMoeExperts | GroupedExperts,
+    layer: MegaMoeExperts | TorchExperts,
     hidden_states: torch.Tensor,
     topk_ids: torch.Tensor,
     topk_weights: torch.Tensor,
@@ -289,18 +280,7 @@ def forward_layer(
             hidden_states, topk_ids, topk_weights,
             tokens_per_expert=tokens_per_expert,
         )
-    if tokens_per_expert is None:
-        tokens_per_expert = torch.bincount(
-            topk_ids.reshape(-1).to(torch.int64), minlength=layer.num_experts,
-        )
-    routed_input, mapping = torch_npu.npu_moe_token_permute(
-        hidden_states.reshape(-1, hidden_states.shape[-1]), topk_ids,
-    )
-    expert_output = layer(routed_input, tokens_per_expert)
-    output = torch_npu.npu_moe_token_unpermute(
-        expert_output, mapping, probs=topk_weights.float().contiguous(),
-    )
-    return output.reshape(hidden_states.shape)
+    return layer(hidden_states, topk_ids, topk_weights)
 
 
 def run_layer(
@@ -354,7 +334,7 @@ def expert_weight_gradients(
     """Return expert gradients in MegaMoe's packed local layout."""
     if isinstance(layer, MegaMoeExperts):
         return layer.gate_up_weight.grad, layer.down_weight.grad
-    if not isinstance(layer, GroupedExperts):
+    if not isinstance(layer, TorchExperts):
         raise TypeError(f"unsupported expert layer type {type(layer).__name__}.")
     gate_grad = layer.w1.grad
     up_grad = layer.w3.grad
@@ -379,7 +359,7 @@ def expert_weights(
     """Return expert weights in MegaMoe's packed local layout."""
     if isinstance(layer, MegaMoeExperts):
         return layer.gate_up_weight, layer.down_weight
-    if not isinstance(layer, GroupedExperts):
+    if not isinstance(layer, TorchExperts):
         raise TypeError(f"unsupported expert layer type {type(layer).__name__}.")
     gate_weight = _local_tensor(layer.w1)
     up_weight = _local_tensor(layer.w3)
@@ -568,6 +548,7 @@ def _new_performance_layer(
         num_experts=shape.num_experts,
         top_k=shape.top_k,
         initial_capacity_factor=1.5 if os.getenv("HP_MEGA_MOE_DISPATCH_MODE", "push") == "push" else None,
+        dispatch_mode=os.getenv("HP_MEGA_MOE_DISPATCH_MODE", "push"),
         ep_size=shape.ep_size,
         ep_group=dist.group.WORLD,
     ).to(
@@ -744,13 +725,7 @@ def test_mega_moe_fwd_bwd_performance() -> None:
     common_median = results["common"]["rank_max_fwd_bwd_ms"]["median"]
     mega_median = results["mega_moe"]["rank_max_fwd_bwd_ms"]["median"]
     ratio = mega_median / common_median
-    maximum_ratio = float(os.getenv("HP_MEGA_MOE_MAX_PERF_RATIO", "1.10"))
-    if ratio > maximum_ratio:
-        raise AssertionError(
-            "MegaMoe routed-expert performance regressed: "
-            f"common_ms={common_median}, mega_ms={mega_median}, "
-            f"ratio={ratio:.6f}, maximum_ratio={maximum_ratio:.6f}."
-        )
+    # This independent oracle is for correctness, not the former GroupedExperts speed gate.
     if RANK == 0:
         result_path = os.getenv("HP_MEGA_MOE_PERF_RESULT")
         if not result_path:
@@ -759,7 +734,8 @@ def test_mega_moe_fwd_bwd_performance() -> None:
             "order": ["common", "mega_moe"],
             "results": results,
             "mega_over_common": ratio,
-            "maximum_allowed_ratio": maximum_ratio,
+            "performance_acceptance": False,
+            "reference_kind": "independent_torch_correctness_oracle",
         }
         path = Path(result_path)
         path.parent.mkdir(parents=True, exist_ok=True)

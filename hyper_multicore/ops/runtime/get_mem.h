@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HYPER_PARALLEL_MULTICORE_GET_MEM_H
-#define HYPER_PARALLEL_MULTICORE_GET_MEM_H
+#ifndef HYPER_MULTICORE_MULTICORE_GET_MEM_H
+#define HYPER_MULTICORE_MULTICORE_GET_MEM_H
 
 #include "kernel_operator.h"
 #include "data_plane/rma.h"
 
 template <typename T>
 __aicore__ inline void PullToLocal(GM_ADDR destination, GM_ADDR source, int64_t elements, int source_pe) {
-  hyper_parallel::multicore::shmem::data_plane::get_pipelined<T>(destination, source, elements, source_pe);
+  hyper_multicore::shmem::data_plane::get_pipelined<T>(destination, source, elements, source_pe);
 }
 
-#endif  // HYPER_PARALLEL_MULTICORE_GET_MEM_H
+#endif  // HYPER_MULTICORE_MULTICORE_GET_MEM_H

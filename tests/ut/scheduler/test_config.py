@@ -16,7 +16,7 @@
 
 import unittest
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     NUM_WORKERS_CUBE,
     TaskSplitValue,
     TaskType,
@@ -25,7 +25,7 @@ from hyper_parallel.core.multicore.scheduler.config import (
     mega_moe_event_capacity,
     validate_runtime_config,
 )
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
 
 
 class TestTaskSplitValue(unittest.TestCase):

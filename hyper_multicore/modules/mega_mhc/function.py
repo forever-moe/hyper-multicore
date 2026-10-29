@@ -21,9 +21,9 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.common import MegaMhcGradCache
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.function import _resolve_core_counts, hyper_mega_mhc_grad
-from hyper_parallel.core.multicore.torch import ops as multicore_ops
+from hyper_multicore.modules.mega_mhc_grad.common import MegaMhcGradCache
+from hyper_multicore.modules.mega_mhc_grad.function import _resolve_core_counts, hyper_mega_mhc_grad
+from hyper_multicore.torch import ops as multicore_ops
 
 from ..mega_mhc_common import (
     MHC_SINKHORN_ITERS,

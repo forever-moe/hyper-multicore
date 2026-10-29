@@ -60,11 +60,11 @@ def run_acceptance_worker(
     monkeypatch.setenv("HP_DYNAMIC_DISPATCH", mode)
     monkeypatch.setenv("HP_MEGA_MOE_WORLD_SIZE", str(cards))
     monkeypatch.setenv("HP_MEGA_MOE_LEVEL1_RESULT", str(result_path))
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
     if cards == 2:
-        monkeypatch.setenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE", str(heap_bytes))
+        monkeypatch.setenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE", str(heap_bytes))
     else:
-        monkeypatch.delenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE", raising=False)
+        monkeypatch.delenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE", raising=False)
     launch(result_dir)
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert len(result["ranks"]) == cards, f"expected {cards} rank records, got {len(result['ranks'])}."

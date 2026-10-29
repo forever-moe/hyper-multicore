@@ -56,7 +56,7 @@ aclTensor *CreateContiguousTensorList(const aclTensor *tensorList, aclOpExecutor
   return tensor;
 }
 
-static void SetTransposedTensorListContiguous(hyper_parallel::multicore::HyperMegaMoeGradParams &params,
+static void SetTransposedTensorListContiguous(hyper_multicore::HyperMegaMoeGradParams &params,
                                               aclOpExecutor *executorPtr) {
   aclTensor *hidden = CreateContiguousTensorList(params.hidden, executorPtr);
   params.hidden = hidden;
@@ -118,7 +118,7 @@ ACLNN_API aclnnStatus aclnnHyperMegaMoeGradGetWorkspaceSize(
   aclOpExecutor *executorPtr = uniqueExecutor.get();
   CHECK_RET(executorPtr != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-  hyper_parallel::multicore::HyperMegaMoeGradParams params{hidden, w1, permute_out, weight};
+  hyper_multicore::HyperMegaMoeGradParams params{hidden, w1, permute_out, weight};
   SetTransposedTensorListContiguous(params, executorPtr);
 
 // Create contiguous tensors in a batch and check for null pointers.

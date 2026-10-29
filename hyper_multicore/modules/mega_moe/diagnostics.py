@@ -19,11 +19,11 @@ __all__ = []
 from dataclasses import dataclass
 from typing import Any
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TaskDescC,
     TaskSplitValue,
 )
-from hyper_parallel.core.multicore.scheduler.graph import OperatorNode, OpType
+from hyper_multicore.scheduler.graph import OperatorNode, OpType
 
 
 MEGA_MOE_OWNER_LABEL = "Expert"

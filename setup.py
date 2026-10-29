@@ -1,4 +1,4 @@
-# Copyright 2025-2026 Huawei Technologies Co., Ltd
+# Copyright 2026 Huawei Technologies Co., Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,283 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""setup package."""
-import sys
-import logging
+"""Package standalone Python sources and an explicitly built native payload."""
+
+import json
 import os
+from pathlib import Path
+import runpy
 import shutil
-import stat
-import platform
-import subprocess
-from importlib import import_module
-from setuptools import setup, find_packages, find_namespace_packages, Distribution
-from setuptools.command.egg_info import egg_info
+import sys
+
+from setuptools import Distribution, find_packages, setup
 from setuptools.command.build_py import build_py
-from setuptools.command.install import install
 
-ROOT_DIR = os.path.dirname(__file__)
-logger = logging.getLogger(__name__)
-
-TORCH26_REQUIRES = [
-    "torch==2.6.0",
-    "torch-npu==2.6.0.post3",
-]
-
-TORCH27_REQUIRES = [
-    "torch==2.7.1",
-    "torch-npu==2.7.1",
-]
-
-TORCH29_REQUIRES = [
-    "torch==2.9.1",
-    "torch-npu==2.9.1",
-]
-
-def _read_requirements(requirements_path: str) -> list[str]:
-    """Read Python requirement lines from a repository-local file."""
-    with open(os.path.join(ROOT_DIR, requirements_path), encoding='utf-8') as file:
-        return [
-            line.strip()
-            for line in file
-            if line.strip() and not line.strip().startswith("#")
-        ]
-
-
-def get_readme_content() -> str:
-    """Read and return the contents of README.md for use as the package long description."""
-    pwd = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(pwd, 'README.md'), encoding='UTF-8') as f:
-        return f.read()
-
-
-def get_platform() -> str:
-    """
-    Get platform name.
-
-    Returns:
-        str, platform name in lowercase.
-    """
-    return f"{platform.system().strip().lower()}_{platform.machine().strip().lower()}"
-
-
-def get_description() -> str:
-    """
-    Get description.
-
-    Returns:
-        str, wheel package description.
-    """
-    os_info = get_platform()
-    cpu_info = platform.machine().strip()
-
-    return f'hyper_parallel platform: {os_info}, cpu: {cpu_info}'
-
-
-def get_install_requires() -> list[str]:
-    """
-    Get install requirements.
-
-    Returns:
-        list, list of dependent packages.
-    """
-    return _read_requirements('requirements.txt')
-
-
-def get_extra_requires() -> dict[str, list[str]]:
-    """
-    Get optional framework requirements.
-
-    Returns:
-        dict, optional dependency groups keyed by extra name.
-    """
-    return {
-        "torch": list(TORCH29_REQUIRES),
-        "torch26": list(TORCH26_REQUIRES),
-        "torch27": list(TORCH27_REQUIRES),
-        "torch29": list(TORCH29_REQUIRES),
-        "all": list(TORCH29_REQUIRES),
-    }
-
-
-def update_permissions(path: str) -> None:
-    """
-    Update permissions.
-
-    Args:
-        path (str): Target directory path.
-    """
-    for dirpath, dirnames, filenames in os.walk(path):
-        for dirname in dirnames:
-            dir_fullpath = os.path.join(dirpath, dirname)
-            os.chmod(dir_fullpath, stat.S_IREAD | stat.S_IEXEC | stat.S_IWRITE)
-        for filename in filenames:
-            file_fullpath = os.path.join(dirpath, filename)
-            os.chmod(file_fullpath, stat.S_IREAD | stat.S_IWRITE)
-
-
-def write_commit_id(target_lib_dir: str) -> None:
-    """Write repository revision information into the wheel build tree.
-
-    Args:
-        target_lib_dir: Built ``hyper_parallel`` package directory.
-    """
-    commit_id_path = os.path.join(target_lib_dir, '.commit_id')
-    try:
-        branch = subprocess.run(
-            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-            cwd=ROOT_DIR,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        commit = subprocess.run(
-            ['git', 'log', '--abbrev-commit', '-1'],
-            cwd=ROOT_DIR,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        content = branch + commit
-    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        logger.warning('Cannot get Git revision information: %s', exc)
-        content = 'git is not available while building.\n'
-    with open(commit_id_path, 'w', encoding='utf-8') as commit_id_file:
-        commit_id_file.write(content)
-
-
-class EggInfo(egg_info):
-    """Egg info."""
-
-    def run(self) -> None:
-        """Regenerate package metadata and normalize its permissions."""
-        egg_info_dir = os.path.join(os.path.dirname(
-            __file__), 'hyper_parallel.egg-info')
-        shutil.rmtree(egg_info_dir, ignore_errors=True)
-        super().run()
-        update_permissions(egg_info_dir)
+ROOT = Path(__file__).resolve().parent
+COMPONENT_VERSION = "0.1.0.dev0"
+payload = os.environ.get("HYPER_MULTICORE_NATIVE_OUTPUT_ROOT", "").strip()
+info = (json.loads((Path(payload) / "build_info.json").read_text(encoding="utf-8"))
+        if payload and "sdist" not in sys.argv else None)
 
 
 class BuildPy(build_py):
-    """Build py files."""
+    """Copy only a validated, explicitly selected native payload into a wheel."""
 
     def run(self) -> None:
-        """Build Python sources and copy the explicitly prepared native payload."""
-        shutil.rmtree(self.build_lib, ignore_errors=True)
+        """Reject release wheels without native files; permit editable Host development."""
+        if info is None and "editable_wheel" not in sys.argv:
+            raise RuntimeError("Native payload required for wheels; run bash build.sh. Use editable for Host UT.")
         super().run()
-        target_lib_dir = os.path.join(self.build_lib, 'hyper_parallel')
-        native_payload = os.environ.get("HYPER_PARALLEL_NATIVE_OUTPUT_ROOT", "").strip()
-        if native_payload:
-            if not os.path.isdir(native_payload):
-                logger.warning(
-                    "[HP-NATIVE-PAYLOAD-MISSING] wheel will contain only successfully built Python sources: %s",
-                    native_payload,
-                )
-            else:
-                shutil.copytree(native_payload, target_lib_dir, dirs_exist_ok=True)
-                logger.info("Copied optional native payload from %s", native_payload)
-        else:
-            logger.info("No native payload selected; assembling a core-only wheel.")
-        write_commit_id(target_lib_dir)
-        update_permissions(target_lib_dir)
-
-
-class Install(install):
-    """Install."""
-
-    def run(self) -> None:
-        """Install the package and normalize installed-file permissions."""
-        super().run()
-        if sys.argv[-1] == 'install':
-            pip = import_module('pip')
-            hyper_parallel_dir = os.path.join(
-                os.path.dirname(pip.__path__[0]), 'hyper_parallel')
-            update_permissions(hyper_parallel_dir)
+        if info is not None:
+            helper = runpy.run_path(str(ROOT / "hyper_multicore/_build/artifacts.py"))
+            helper["validate_payload"](Path(payload), info)
+            shutil.copytree(payload, Path(self.build_lib) / "hyper_multicore", dirs_exist_ok=True)
 
 
 class BinaryDistribution(Distribution):
-    """Force wheel to be tagged as a binary distribution.
-
-    The package ships pre-compiled .so files prepared by component build entries
-    and merged from their payloads. Without this hint setuptools/wheel would label
-    the wheel as pure-python (py3-none-any), which lets pip install it under
-    incompatible Python versions or CPU architectures and triggers
-    'Python version mismatch' at import time.
-    """
+    """Keep native wheel tags specific to the actual Python ABI and Host platform."""
 
     def has_ext_modules(self) -> bool:
-        """Return True so wheel is tagged for a specific cpython + platform."""
+        """Return true because published wheels contain native extensions."""
         return True
 
 
-if __name__ == '__main__':
-    _cmdclass = {
-        'egg_info': EggInfo,
-        'build_py': BuildPy,
-        'install': Install,
-    }
-    setup(
-        name='hyper_parallel',
-        version='1.2.0.dev0',
-        author='The MindSpore Authors',
-        url='https://www.mindspore.cn',
-        download_url='https://gitcode.com/mindspore/hyper-parallel/tags',
-        project_urls={
-            'Sources': 'https://gitcode.com/mindspore/hyper-parallel',
-            'Issue Tracker': 'https://gitcode.com/mindspore/hyper-parallel/issues',
-        },
-        description=get_description(),
-        long_description=get_readme_content(),
-        long_description_content_type="text/markdown",
-        test_suite="tests",
-        packages=find_packages(exclude=["*tests*"]) + find_namespace_packages(
-            include=["hyper_parallel.rl", "hyper_parallel.rl.rl", "hyper_parallel.rl.rl.*",
-                     "hyper_parallel.rl.examples", "hyper_parallel.rl.examples.*"],
-        ),
-        platforms=[get_platform()],
-        include_package_data=True,
-        scripts=['hyper_parallel/core/multicore/scripts/hyper_parallel_multicore_set_env.bash'],
-        package_data={
-            'hyper_parallel.core.shard.ops': ['yaml/*.yaml'],
-            'hyper_parallel.components.functional._triton.gated_delta_net': ['GDN_LICENSE'],
-            'hyper_parallel.components.functional._triton.kimi_delta_attention': ['KDA_README.md'],
-            'hyper_parallel.core.multicore': ['README.md', 'docs/**/*', 'examples/**/*', 'set_env.bash'],
-            # Model adapter recipes + committed codegen reference bundles.
-            'hyper_parallel.models.qwen3_moe': [
-                'recipes/*.yaml', 'generated/*.json', 'generated/*.diff',
-            ],
-            'hyper_parallel.models.deepseek_v41': [
-                'generated/*.json', 'generated/*.diff',
-            ],
-            'hyper_parallel.auto_parallel': ['op_profiles/*.yaml', 'op_records.yaml'],
-            'hyper_parallel.auto_parallel.sapp_nd.memory_estimation': [
-                'configs_eval/default.yaml',
-            ],
-            'hyper_parallel.auto_parallel.sapp_nd.nd.common.framework_parsers': [
-                'mapping.yaml',
-            ],
-        },
-        cmdclass=_cmdclass,
-        distclass=BinaryDistribution,
-        python_requires='>=3.10,<3.13',
-        install_requires=get_install_requires(),
-        extras_require=get_extra_requires(),
-        classifiers=[
-            'Development Status :: 4 - Beta',
-            'Environment :: Console',
-            'Environment :: Web Environment',
-            'Intended Audience :: Science/Research',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: Apache Software License',
-            'Programming Language :: Python :: 3 :: Only',
-            'Programming Language :: Python :: 3.10',
-            'Programming Language :: Python :: 3.11',
-            'Programming Language :: Python :: 3.12',
-            'Topic :: Scientific/Engineering',
-            'Topic :: Scientific/Engineering :: Artificial Intelligence',
-            'Topic :: Software Development',
-            'Topic :: Software Development :: Libraries',
-            'Topic :: Software Development :: Libraries :: Python Modules',
-        ],
-        license='Apache 2.0',
-        keywords='hyper_parallel',
-    )
+setup(
+    name="hyper-multicore",
+    version=info["artifact_version"] if info else COMPONENT_VERSION,
+    description="Standalone Ascend multicore operators and PyTorch runtime",
+    long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
+    url="https://github.com/forever-moe/hyper-multicore",
+    license="Apache-2.0",
+    python_requires=">=3.10,<3.13",
+    packages=find_packages(include=["hyper_multicore", "hyper_multicore.*"]),
+    install_requires=["numpy>=1.26,<2", f"torch=={info['torch_version']}" if info else "torch"],
+    scripts=["scripts/hyper_multicore_set_env.bash"],
+    include_package_data=False,
+    package_data={"hyper_multicore": ["ops/runtime/*.h", "ops/runtime/*.hpp"]},
+    cmdclass={"build_py": BuildPy},
+    distclass=BinaryDistribution,
+)

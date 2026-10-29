@@ -27,7 +27,7 @@ import subprocess
 from typing import Any
 
 
-_VENDOR_NAME = "hyper_parallel_multicore_nn"
+_VENDOR_NAME = "hyper_multicore_nn"
 _KERNEL_ROOT = Path("op_impl/ai_core/tbe/kernel")
 _KERNEL_CONFIG_ROOT = _KERNEL_ROOT / "config"
 _CONFIG_ROOT = Path("op_impl/ai_core/tbe/config")

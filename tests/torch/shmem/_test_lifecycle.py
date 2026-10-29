@@ -22,8 +22,8 @@ import pytest
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore import shmem
-from tests.torch.multicore.shmem._worker_utils import ACQUIRE_HINT, acquire_runtime
+from hyper_multicore import shmem
+from tests.torch.shmem._worker_utils import ACQUIRE_HINT, acquire_runtime
 
 
 _REINIT_RANK_SKEW_SECONDS = 1.0
@@ -140,7 +140,7 @@ def test_binding_reinit_with_different_heap_sizes() -> None:
     stale_tensor = None
 
     for cycle, (heap_size, allocation_size) in enumerate(zip(heap_sizes, allocation_sizes)):
-        os.environ["HYPER_PARALLEL_SHMEM_HEAP_SIZE"] = str(heap_size)
+        os.environ["HYPER_MULTICORE_SHMEM_HEAP_SIZE"] = str(heap_size)
         if cycle > 0 and local_rank == dist.get_world_size() - 1:
             time.sleep(_REINIT_RANK_SKEW_SECONDS)
         shmem.acquire()
@@ -210,12 +210,12 @@ def test_binding_init_timeout_injection(capfd: pytest.CaptureFixture[str]) -> No
     runtime_failures = [
         line
         for line in native_log.splitlines()
-        if "[HP_SHMEM " in line and "[Initialize|CannCall]" in line
+        if "[HYPER_MULTICORE_SHMEM " in line and "[Initialize|CannCall]" in line
     ]
     assert runtime_failures, f"expected a Runtime failure log, got output={native_log!r}"
     runtime_prefix = re.compile(
         r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6} error \d+ pid\[\d+\] "
-        r"\[HP_SHMEM runtime\.cpp:\d+\] \[rank 0\] \[Initialize\|CannCall\] "
+        r"\[HYPER_MULTICORE_SHMEM runtime\.cpp:\d+\] \[rank 0\] \[Initialize\|CannCall\] "
     )
     assert all(runtime_prefix.match(line) for line in runtime_failures), runtime_failures
     for line in runtime_failures:

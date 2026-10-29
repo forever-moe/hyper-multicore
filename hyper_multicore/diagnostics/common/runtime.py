@@ -21,12 +21,12 @@ from enum import IntEnum
 from threading import Lock
 from typing import Any
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import (
+from hyper_multicore.diagnostics.common.graph import (
     DiagnosticSpec, GraphDiagnosticMetadata, build_graph_metadata, validate_mega_kernel_diagnostic_contract,
 )
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph
-from hyper_parallel.core.multicore.scheduler.runtime import serialize_runtime_config
+from hyper_multicore.scheduler.config import RuntimeConfigC
+from hyper_multicore.scheduler.graph import ComputeGraph
+from hyper_multicore.scheduler.runtime import serialize_runtime_config
 
 
 class DiagnosticMode(IntEnum):

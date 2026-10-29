@@ -19,7 +19,7 @@
 #include "runtime/config.h"
 #include "runtime/types.h"
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 
 /** @brief Runtime operation associated with the latest Runtime-owned failure. */
 enum class DfxOperation : uint8_t {
@@ -63,4 +63,4 @@ struct DfxSnapshot {
   std::optional<DfxFailure> latest_failure;
 };
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

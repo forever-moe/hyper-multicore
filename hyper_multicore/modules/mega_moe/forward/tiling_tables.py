@@ -22,7 +22,7 @@ struct-based SwiGLU tiling is expanded 49 times (= 2 * 24 + 1 for Ascend 910B).
 import copy
 import ctypes
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     SwiGluTilingDataC,
 )
 

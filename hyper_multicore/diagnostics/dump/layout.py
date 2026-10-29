@@ -17,8 +17,8 @@
 from collections.abc import Sequence
 import re
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import operator_diagnostic_name
-from hyper_parallel.core.multicore.scheduler.graph import OperatorNode
+from hyper_multicore.diagnostics.common.graph import operator_diagnostic_name
+from hyper_multicore.scheduler.graph import OperatorNode
 
 
 _SAFE_FILE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")

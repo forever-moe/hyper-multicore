@@ -24,15 +24,15 @@ import torch.distributed as dist
 import torch.nn.functional as F
 import torch_npu
 
-from hyper_parallel.components.functional.grouped_matmul import grouped_matmul
-from hyper_parallel.core.multicore import MegaMoeExperts
-from hyper_parallel.core.multicore.modules.mega_moe import function as mega_function
-from hyper_parallel.core.multicore.modules.mega_moe.function import execute_mega_moe
-from hyper_parallel.core.multicore.modules.mega_moe.route import (
+from tests.common.multicore.moe_reference import grouped_matmul
+from hyper_multicore import MegaMoeExperts
+from hyper_multicore.modules.mega_moe import function as mega_function
+from hyper_multicore.modules.mega_moe.function import execute_mega_moe
+from hyper_multicore.modules.mega_moe.route import (
     PreparedTopKRoute,
     prepare_topk_route,
 )
-from tests.torch.multicore import _test_mega_moe as baseline
+from tests.torch import _test_mega_moe as baseline
 
 
 _CLAMP_LIMIT = 10.0

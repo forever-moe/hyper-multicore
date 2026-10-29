@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_gate.module import MegaGate
+from hyper_multicore.modules.mega_gate.module import MegaGate
 
 
 class TestMegaGate(unittest.TestCase):

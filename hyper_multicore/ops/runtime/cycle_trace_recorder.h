@@ -13,8 +13,8 @@
  * @brief Reusable per-core cycle interval recorder for TaskDesc-based megakernels.
  */
 
-#ifndef HYPER_PARALLEL_CORE_MULTICORE_OPS_RUNTIME_CYCLE_TRACE_RECORDER_H_
-#define HYPER_PARALLEL_CORE_MULTICORE_OPS_RUNTIME_CYCLE_TRACE_RECORDER_H_
+#ifndef HYPER_MULTICORE_CORE_MULTICORE_OPS_RUNTIME_CYCLE_TRACE_RECORDER_H_
+#define HYPER_MULTICORE_CORE_MULTICORE_OPS_RUNTIME_CYCLE_TRACE_RECORDER_H_
 
 #include "kernel_operator.h"   // NOLINT(build/include_subdir): public AscendC SDK header.
 #include "runtime_config.hpp"  // NOLINT(build/include_subdir): adjacent assembled runtime header.

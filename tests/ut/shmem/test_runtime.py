@@ -20,8 +20,8 @@ from unittest.mock import Mock, call, patch
 
 import torch
 
-from hyper_parallel.core.multicore import _collective
-from hyper_parallel.core.multicore.shmem import _lifecycle
+from hyper_multicore import _collective
+from hyper_multicore.shmem import _lifecycle
 from tests.common.mark_utils import arg_mark
 
 
@@ -185,7 +185,7 @@ class TestRuntimeLifecycle(unittest.TestCase):
     def test_bootstrap_failure_has_root_rank_summary_and_full_cause(self) -> None:
         """The bootstrap error names its owner without duplicating the Native exception type."""
         native_error = RuntimeError(
-            "[HYPER_PARALLEL_SHMEM_ERROR] error_code=CANN_ERROR operation=get_unique_id "
+            "[HYPER_MULTICORE_SHMEM_ERROR] error_code=CANN_ERROR operation=get_unique_id "
             "phase=CannCall cann_error_code=-4 message=SHMEM unique ID creation failed: "
             "ACLSHMEM_INNER_ERROR(-4), cann_detail=[[SHM_SHMEM bootstrap.cpp:42] failed]"
         )
@@ -436,8 +436,8 @@ class TestRuntimeLifecycle(unittest.TestCase):
             active_allocations.clear()
 
         with (
-            patch("hyper_parallel.core.multicore.shmem._api.free", side_effect=free),
-            patch("hyper_parallel.core.multicore.shmem._api.empty", side_effect=lambda *_a, **_k: replacement),
+            patch("hyper_multicore.shmem._api.free", side_effect=free),
+            patch("hyper_multicore.shmem._api.empty", side_effect=lambda *_a, **_k: replacement),
             patch.object(_lifecycle.time, "perf_counter", side_effect=lambda: clock[0]),
             patch.object(
                 _lifecycle,
@@ -715,7 +715,7 @@ class TestRuntimeLifecycle(unittest.TestCase):
         """Bootstrap context appears once and retains the Native cause."""
         _lifecycle.acquire()
         native_error = RuntimeError(
-            "[HYPER_PARALLEL_SHMEM_ERROR] error_code=CANN_ERROR operation=get_unique_id "
+            "[HYPER_MULTICORE_SHMEM_ERROR] error_code=CANN_ERROR operation=get_unique_id "
             "phase=CannCall cann_error_code=-4 message=SHMEM unique ID creation failed: "
             "ACLSHMEM_INNER_ERROR(-4), cann_detail=[[SHM_SHMEM bootstrap.cpp:42] failed]"
         )
@@ -745,7 +745,7 @@ class TestRuntimeLifecycle(unittest.TestCase):
         self.dist.is_initialized.return_value = False
         _lifecycle.acquire()
         native_error = RuntimeError(
-            "[HYPER_PARALLEL_SHMEM_ERROR] error_code=CANN_ERROR operation=initialize "
+            "[HYPER_MULTICORE_SHMEM_ERROR] error_code=CANN_ERROR operation=initialize "
             "phase=CannCall cann_error_code=-3 message=SHMEM initialization failed on NPU device 0: "
             "ACLSHMEM_SMEM_ERROR(-3), requested_heap=24.00 GiB, free_large_page_hbm=12.34 GiB, "
             "total_large_page_hbm=52.41 GiB, requested_heap_exceeds_free_large_page_hbm=true, "
@@ -766,7 +766,7 @@ class TestRuntimeLifecycle(unittest.TestCase):
         self.assertIn("requested_heap=24.00 GiB", message)
         self.assertIn("free_large_page_hbm=12.34 GiB", message)
         self.assertIn("restart the process", message)
-        self.assertNotIn("HYPER_PARALLEL_SHMEM_ERROR", message)
+        self.assertNotIn("HYPER_MULTICORE_SHMEM_ERROR", message)
         self.assertNotIn("cann_detail", message)
         self.assertIs(raised.exception.__cause__, native_error)
         self.assertTrue(_lifecycle._runtime_invalidated)  # pylint: disable=protected-access

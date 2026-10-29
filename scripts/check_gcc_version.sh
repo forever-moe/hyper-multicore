@@ -14,7 +14,7 @@
 check_gcc_version() {
     local gcc_bin="${1:-gcc}"
     if ! command -v "${gcc_bin}" >/dev/null 2>&1; then
-        echo "ERROR: ${gcc_bin} not found. hyper_parallel requires GCC >= 7.3.0." >&2
+        echo "ERROR: ${gcc_bin} not found. hyper_multicore requires GCC >= 7.3.0." >&2
         return 1
     fi
 

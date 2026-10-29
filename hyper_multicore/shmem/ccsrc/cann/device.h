@@ -15,7 +15,7 @@
 #include "cann/signal.h"
 #include "shmem.h"
 
-namespace hyper_parallel::multicore::shmem::cann::device {
+namespace hyper_multicore::shmem::cann::device {
 
 /**
  * @brief Translate one local symmetric GM address to the corresponding address on a target Root PE.
@@ -175,4 +175,4 @@ ACLSHMEM_DEVICE void copy_ub_to_gm(__gm__ T *destination, __ubuf__ T *source, ui
   aclshmemi_copy_ub2gm(destination, source, bytes);
 }
 
-}  // namespace hyper_parallel::multicore::shmem::cann::device
+}  // namespace hyper_multicore::shmem::cann::device

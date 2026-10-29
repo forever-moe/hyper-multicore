@@ -22,8 +22,8 @@ import json
 import torch
 import torch_npu  # noqa: F401  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore.modules.mega_mhc_common import MegaMhcOutputs
-from hyper_parallel.core.multicore.modules.mega_mhc.function import hyper_mega_mhc
+from hyper_multicore.modules.mega_mhc_common import MegaMhcOutputs
+from hyper_multicore.modules.mega_mhc.function import hyper_mega_mhc
 from tests.common.multicore.mega_mhc_golden import (
     cann_mega_mhc,
     torch_mega_mhc,

@@ -24,7 +24,7 @@ from enum import Enum
 import struct
 from typing import Any
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     EVENT_INVALID_ID,
     INVALID_PROFILE_DESC_ID,
     INVALID_PROFILE_OWNER_ID,
@@ -34,8 +34,8 @@ from hyper_parallel.core.multicore.scheduler.config import (
     TaskDescC,
     TaskType,
 )
-from hyper_parallel.core.multicore.diagnostics.common.graph import _scheduled_task_ids
-from hyper_parallel.core.multicore.diagnostics.common.runtime import DiagnosticMode, PreparedDiagnosticRuntime
+from hyper_multicore.diagnostics.common.graph import _scheduled_task_ids
+from hyper_multicore.diagnostics.common.runtime import DiagnosticMode, PreparedDiagnosticRuntime
 
 
 CUBE_SLOT_COUNT = NUM_WORKERS_CUBE

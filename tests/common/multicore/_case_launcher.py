@@ -25,28 +25,34 @@ import tempfile
 import time
 
 from tests.common.distributed_launcher import torchrun_case
-from tests.torch.multicore._test_env import INHERITED_RANK_VARIABLES
+from tests.common.multicore._test_env import INHERITED_RANK_VARIABLES
 
 def run_multicore_case(
-    file_name: str, case_name: str, num_proc: int = 1, timeout: float | None = 420,
+    file_name: str, case_name: str, num_proc: int = 1, timeout: float = 1200,
+    *, num_devices: int | None = None,
 ) -> None:
     """Reserve physical NPUs before starting the bounded worker process group.
 
     Device indices follow the inherited ASCEND_RT_VISIBLE_DEVICES allocation.
     Only multicore launchers share these locks; unrelated tests are unaffected.
-    Lock waiting is excluded from the worker deadline.
+    Lock waiting is included in the total case deadline.
     """
     if num_proc < 1:
         raise ValueError("num_proc must be positive")
+    device_count = num_proc if num_devices is None else num_devices
+    if device_count < num_proc:
+        raise ValueError("num_devices must cover every worker")
+    if timeout is None or timeout <= 0:
+        raise ValueError("timeout must be positive and bounded")
     env = os.environ.copy()
-    cpu = env.get("HYPER_PARALLEL_TEST_DEVICE_TYPE", "").strip().lower() == "cpu"
+    cpu = env.get("HYPER_MULTICORE_TEST_DEVICE_TYPE", "").strip().lower() == "cpu"
     allocated = None if cpu else env.get("ASCEND_RT_VISIBLE_DEVICES")
-    devices = list(map(int, allocated.split(","))) if allocated else list(range(num_proc))
+    devices = list(map(int, allocated.split(","))) if allocated else list(range(device_count))
     if cpu:
         devices = []
-    if not cpu and (len(devices) < num_proc or min(devices) < 0 or len(set(devices)) != len(devices)):
+    if not cpu and (len(devices) < device_count or min(devices) < 0 or len(set(devices)) != len(devices)):
         raise ValueError("invalid or insufficient ASCEND_RT_VISIBLE_DEVICES allocation")
-    devices = devices[:num_proc]
+    devices = devices[:device_count]
     if cpu:
         env.pop("ASCEND_RT_VISIBLE_DEVICES", None)
     else:
@@ -56,7 +62,7 @@ def run_multicore_case(
     # CI may invoke pytest from tests/ without placing the archive root in its environment.
     root = str(Path(__file__).resolve().parents[3])
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (root, env.get("PYTHONPATH"))))
-    command = [sys.executable, "-m", "tests.torch.multicore._case_launcher", file_name, case_name, str(num_proc)]
+    command = [sys.executable, "-m", "tests.common.multicore._case_launcher", file_name, case_name, str(num_proc)]
     started = time.monotonic()
     print(f"Multicore {case_name}: waiting for devices={devices}", flush=True)
     with ExitStack() as locks:
@@ -65,7 +71,14 @@ def run_multicore_case(
         for device in sorted(devices):
             path = Path(tempfile.gettempdir()) / f"hp_multicore_npu_{os.getuid()}_{device}.lock"
             lock = locks.enter_context(path.open("a", encoding="utf-8"))
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            while True:
+                try:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() - started >= timeout:
+                        raise TimeoutError(f"Device lease timeout for {case_name}: {devices}")
+                    time.sleep(0.2)
             lock_files.append(lock)
         print(
             f"Multicore {case_name}: acquired devices={devices}, waited={time.monotonic() - started:.3f}s", flush=True,
@@ -75,7 +88,7 @@ def run_multicore_case(
             command, env=env, start_new_session=True, pass_fds=tuple(lock.fileno() for lock in lock_files),
         ) as process:
             try:
-                returncode = process.wait(timeout=timeout)
+                returncode = process.wait(timeout=max(0.001, timeout - (time.monotonic() - started)))
             finally:
                 # Release devices only after workers and any surviving descendants stop.
                 try:

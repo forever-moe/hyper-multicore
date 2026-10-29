@@ -22,7 +22,7 @@
 #include "cann/log.h"
 #include "shmem.h"
 
-namespace hyper_parallel::multicore::shmem::cann::host {
+namespace hyper_multicore::shmem::cann::host {
 namespace {
 
 constexpr uint32_t kOptionalAttrVersionMajor = 1U;
@@ -398,4 +398,4 @@ runtime::Result<DeviceIdentity> query_device_identity() {
   return runtime::Result<DeviceIdentity>::Success(DeviceIdentity{current_device.value(), model.value(), soc_name});
 }
 
-}  // namespace hyper_parallel::multicore::shmem::cann::host
+}  // namespace hyper_multicore::shmem::cann::host

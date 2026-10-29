@@ -23,7 +23,7 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.diagnostics.dump.layout import _SAFE_FILE_NAME, _stage_names
+from hyper_multicore.diagnostics.dump.layout import _SAFE_FILE_NAME, _stage_names
 
 
 @dataclass(frozen=True)

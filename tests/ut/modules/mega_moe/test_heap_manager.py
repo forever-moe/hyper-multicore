@@ -22,18 +22,18 @@ from unittest.mock import Mock, patch
 
 import torch
 
-from hyper_parallel.core.multicore import _collective, shmem
-from hyper_parallel.core.multicore.modules.mega_moe import heap_manager as heap_manager_module
-from hyper_parallel.core.multicore.modules.mega_moe.heap_manager import (
+from hyper_multicore import _collective, shmem
+from hyper_multicore.modules.mega_moe import heap_manager as heap_manager_module
+from hyper_multicore.modules.mega_moe.heap_manager import (
     _HeapManager,
     _WorkspaceLayout,
     _get_heap_manager,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.workspace import (
+from hyper_multicore.modules.mega_moe.workspace import (
     MegaMoeWorkspace,
     _workspace_allocation_specs,
 )
-from hyper_parallel.core.multicore.shmem import _lifecycle
+from hyper_multicore.shmem import _lifecycle
 from tests.common.mark_utils import arg_mark
 
 

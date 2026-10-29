@@ -15,13 +15,21 @@
 """NPU workers for SHMEM Allocation and Tensor lifecycle system tests."""
 
 import gc
+import os
+from pathlib import Path
 
 import pytest
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore import shmem
-from tests.torch.multicore.shmem._worker_utils import ACQUIRE_HINT, acquire_runtime, release_runtime
+from hyper_multicore import shmem
+from tests.torch.shmem._worker_utils import ACQUIRE_HINT, acquire_runtime, release_runtime
+
+
+def _native_log_text() -> str:
+    """Read this worker's isolated SHMEM file sink instead of assuming stderr."""
+    log_path = Path(os.environ["SHMEM_LOG_PATH"])
+    return "\n".join(path.read_text(encoding="utf-8") for path in sorted(log_path.glob("aclshmem_*.log")))
 
 
 def test_binding_allocation_and_release() -> None:
@@ -37,7 +45,7 @@ def test_binding_allocation_and_release() -> None:
     release_runtime()
 
 
-def test_binding_storage_invalidated_after_free(capfd) -> None:
+def test_binding_storage_invalidated_after_free() -> None:
     """Zero the shared Storage after free so stale Tensors and views stop exposing the address."""
     acquire_runtime()
     allocation_a = shmem.empty(64, dtype=torch.uint8)
@@ -50,9 +58,14 @@ def test_binding_storage_invalidated_after_free(capfd) -> None:
         shmem.free(allocation_a)
     del stale_view, allocation_a
     gc.collect()
-    assert "orphaned=true" not in capfd.readouterr().err, (
+    error = _native_log_text()
+    assert "[Free|CannCall] aclshmem_free ok" in error, f"missing native free control record: {error!r}"
+    assert "orphaned=true" not in error, (
         "Released Storage must not be reported as an active orphan after a repeated free is rejected"
     )
+    state = shmem.debug_state()
+    assert state["allocated_count"] == 0, f"released Storage retained an active Allocation: {state!r}"
+    assert state["leaked_allocations"] == [], f"released Storage was incorrectly marked orphaned: {state!r}"
     allocation_b = shmem.empty(64, dtype=torch.uint8)
     shmem.free(allocation_b)
     release_runtime()
@@ -84,7 +97,7 @@ def test_binding_stale_tensor_cannot_corrupt_reused_allocation() -> None:
     release_runtime()
 
 
-def test_binding_orphan_storage_warning(capfd) -> None:
+def test_binding_orphan_storage_warning() -> None:
     """Report an active Allocation when its final Tensor Storage reference is lost."""
     acquire_runtime()
     allocation = shmem.empty(64, dtype=torch.uint8)
@@ -100,8 +113,8 @@ def test_binding_orphan_storage_warning(capfd) -> None:
     del allocation
     gc.collect()
 
-    error = capfd.readouterr().err
-    assert error.count("orphaned=true") == 1, f"expected one orphan warning, got stderr={error!r}"
+    error = _native_log_text()
+    assert error.count("orphaned=true") == 1, f"expected one orphan warning, got native log={error!r}"
     assert f"allocation_id={allocation_id}" in error, f"orphan warning omitted Allocation ID: {error!r}"
     assert f"allocation_base=0x{allocation_base:x}" in error, f"orphan warning omitted Allocation base: {error!r}"
     assert "allocation_bytes=64" in error, f"orphan warning omitted Allocation size: {error!r}"

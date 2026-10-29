@@ -28,7 +28,7 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore import _collective, shmem
+from hyper_multicore import _collective, shmem
 
 from ..module import MulticoreModule
 from .function import execute_mega_moe_with_permutation

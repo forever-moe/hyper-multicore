@@ -41,12 +41,12 @@
 
 namespace py = pybind11;
 
-namespace hyper_parallel::multicore::shmem::bindings {
+namespace hyper_multicore::shmem::bindings {
 namespace {
 
 using cann::CompareOp;
 using cann::SignalOp;
-using ::hyper_parallel::multicore::shmem::DeviceModel;
+using ::hyper_multicore::shmem::DeviceModel;
 using runtime::AllocationRecord;
 using runtime::AllocationSpec;
 using runtime::AllocationView;
@@ -63,7 +63,7 @@ using runtime::State;
 using runtime::Status;
 using runtime::StreamView;
 
-constexpr std::string_view kErrorPrefix = "[HYPER_PARALLEL_SHMEM_ERROR]";
+constexpr std::string_view kErrorPrefix = "[HYPER_MULTICORE_SHMEM_ERROR]";
 constexpr std::string_view kAcquireHint = "Call shmem.acquire() before using SHMEM capabilities.";
 
 std::string_view ToString(ErrorCode error_code) {
@@ -793,12 +793,12 @@ void log_debug(const std::string &message) {
 }
 
 }  // namespace
-}  // namespace hyper_parallel::multicore::shmem::bindings
+}  // namespace hyper_multicore::shmem::bindings
 
-PYBIND11_MODULE(hyper_parallel_shmem_torch, module) {
-  namespace bindings = hyper_parallel::multicore::shmem::bindings;
+PYBIND11_MODULE(hyper_multicore_shmem_torch, module) {
+  namespace bindings = hyper_multicore::shmem::bindings;
 
-  module.doc() = "Private Torch binding for the Hyper-Parallel SHMEM Runtime";
+  module.doc() = "Private Torch binding for the HyperMulticore SHMEM Runtime";
   module.def("_get_unique_id", &bindings::GetUniqueId);
   module.def("_initialize", &bindings::Initialize, py::arg("root_rank"), py::arg("root_size"),
              py::arg("unique_id") = py::bytes(), py::arg("heap_size_bytes") = 0);

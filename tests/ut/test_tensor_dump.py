@@ -28,12 +28,12 @@ from torch import (
 )
 from torch.testing import assert_close
 
-from hyper_parallel.core.multicore.diagnostics import prepare_mega_kernel_diagnostics, schedule
-from hyper_parallel.core.multicore.diagnostics import profiler as torch_profiler
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
-from hyper_parallel.core.multicore.diagnostics.dump import api as tensor_dump
-from hyper_parallel.core.multicore.diagnostics.common.session import _reset_active_session_for_test
-from hyper_parallel.core.multicore.scheduler.graph import (
+from hyper_multicore.diagnostics import prepare_mega_kernel_diagnostics, schedule
+from hyper_multicore.diagnostics import profiler as torch_profiler
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.diagnostics.dump import api as tensor_dump
+from hyper_multicore.diagnostics.common.session import _reset_active_session_for_test
+from hyper_multicore.scheduler.graph import (
     ComputeGraph,
     OperatorNode,
     OpType,

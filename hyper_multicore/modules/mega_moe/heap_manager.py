@@ -26,8 +26,8 @@ from typing import Any, NoReturn
 
 import torch
 
-from hyper_parallel.core.multicore import _collective, shmem
-from hyper_parallel.core.multicore.shmem import _lifecycle
+from hyper_multicore import _collective, shmem
+from hyper_multicore.shmem import _lifecycle
 
 from .spec import MegaMoeSpec, _grow_receive_capacity, _resolve_receive_capacity
 from .workspace import MegaMoeWorkspace, _spec_workspace_bytes
@@ -164,7 +164,7 @@ class _HeapManager:
             added_specifications = self._reserve(reservations)
             layouts = [entry.layout for entry in self.entries]
             try:
-                configured = os.getenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE")
+                configured = os.getenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE")
                 if not self._configured:
                     self._run_and_check_consistency(
                         lambda: self._configure(configured),
@@ -329,17 +329,17 @@ class _HeapManager:
                 self.heap_limit = int(configured)
             except ValueError as error:
                 raise ValueError(
-                    "HYPER_PARALLEL_SHMEM_HEAP_SIZE must be a positive integer number of bytes"
+                    "HYPER_MULTICORE_SHMEM_HEAP_SIZE must be a positive integer number of bytes"
                 ) from error
             if self.heap_limit <= 0:
-                raise ValueError("HYPER_PARALLEL_SHMEM_HEAP_SIZE must be positive")
+                raise ValueError("HYPER_MULTICORE_SHMEM_HEAP_SIZE must be positive")
             if self.heap_limit < required:
                 raise RuntimeError(
-                    f"HYPER_PARALLEL_SHMEM_HEAP_SIZE is too small: requires at least {required} bytes"
+                    f"HYPER_MULTICORE_SHMEM_HEAP_SIZE is too small: requires at least {required} bytes"
                 )
             if self.heap_limit % _HEAP_GRANULARITY_BYTES:
                 raise ValueError(
-                    "HYPER_PARALLEL_SHMEM_HEAP_SIZE must be a multiple of the 2 MiB physical page size"
+                    "HYPER_MULTICORE_SHMEM_HEAP_SIZE must be a multiple of the 2 MiB physical page size"
                 )
         self.heap_bytes = self._budget(required)
 

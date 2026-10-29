@@ -23,7 +23,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CANN_SET_ENV = "/usr/local/Ascend/cann/set_env.sh"
-HP_ACTIVATION_SCRIPT = "hyper_parallel_multicore_set_env.bash"
+HP_ACTIVATION_SCRIPT = "hyper_multicore_set_env.bash"
 HP_ACTIVATION_VARIABLES = ("ASCEND_CUSTOM_OPP_PATH", "LD_LIBRARY_PATH")
 INHERITED_RANK_VARIABLES = ("RANK_TABLE_FILE", "RANK_ID", "RANK_SIZE")
 
@@ -33,7 +33,7 @@ def _active_multicore_vendor_roots() -> list[Path]:
     vendor_roots = [
         Path(value).resolve()
         for value in os.environ.get("ASCEND_CUSTOM_OPP_PATH", "").split(os.pathsep)
-        if value and Path(value).name == "hyper_parallel_multicore_nn"
+        if value and Path(value).name == "hyper_multicore_nn"
     ]
     library_roots = {
         Path(value).resolve()
@@ -55,7 +55,7 @@ def multicore_test_environment_is_active() -> bool:
     return bool(_active_multicore_vendor_roots())
 
 
-def multicore_adapter_is_available(adapter_name: str = "hyper_parallel_mega_moe_torch") -> bool:
+def multicore_adapter_is_available(adapter_name: str = "hyper_multicore_mega_moe_torch") -> bool:
     """Return whether the active payload contains one requested Torch adapter.
 
     An existing adapter is considered available even when it is empty. The
@@ -66,7 +66,7 @@ def multicore_adapter_is_available(adapter_name: str = "hyper_parallel_mega_moe_
         Whether any active multicore payload contains the requested adapter.
 
     """
-    if adapter_name not in ("hyper_parallel_mega_gate_torch", "hyper_parallel_mega_moe_torch"):
+    if adapter_name not in ("hyper_multicore_mega_gate_torch", "hyper_multicore_mega_moe_torch"):
         raise ValueError(f"unsupported multicore test adapter: {adapter_name!r}")
     for vendor_root in _active_multicore_vendor_roots():
         adapter = vendor_root.parents[1] / "framework" / "torch" / f"lib{adapter_name}.so"
@@ -86,9 +86,7 @@ def multicore_activation_scripts() -> list[Path]:
         / "build"
         / "native"
         / "payload"
-        / "hyper_parallel"
-        / "core"
-        / "multicore"
+        / "hyper_multicore"
         / "lib"
         / "set_env.bash"
     )

@@ -24,8 +24,8 @@ import math
 import torch
 from torch.nn import functional
 
-from hyper_parallel.core.multicore.modules.mega_gate.function import mega_gate
-from hyper_parallel.core.multicore.modules.mega_gate.plan import MegaGatePlan, build_mega_gate_plan
+from hyper_multicore.modules.mega_gate.function import mega_gate
+from hyper_multicore.modules.mega_gate.plan import MegaGatePlan, build_mega_gate_plan
 
 
 def _reset_mega_gate_parameters(

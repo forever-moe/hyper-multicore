@@ -14,7 +14,7 @@
 # ============================================================================
 
 cmake_minimum_required(VERSION 3.18)
-project(hyper_parallel_shmem_wrapper LANGUAGES NONE)
+project(hyper_multicore_shmem_wrapper LANGUAGES NONE)
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/hardening.cmake)
 
 if(NOT DEFINED HP_SHMEM_SOURCE_DIR OR NOT EXISTS "${HP_SHMEM_SOURCE_DIR}/CMakeLists.txt")
@@ -25,8 +25,8 @@ endif()
 # policy and deliberately applies it after upstream has declared every target.
 add_subdirectory("${HP_SHMEM_SOURCE_DIR}" shmem-upstream)
 
-set_target_properties(shmem PROPERTIES OUTPUT_NAME hyper_parallel_shmem)
-set_target_properties(shmem_utils PROPERTIES OUTPUT_NAME hyper_parallel_shmem_utils)
+set_target_properties(shmem PROPERTIES OUTPUT_NAME hyper_multicore_shmem)
+set_target_properties(shmem_utils PROPERTIES OUTPUT_NAME hyper_multicore_shmem_utils)
 foreach(target_name
         shmem
         shmem_utils

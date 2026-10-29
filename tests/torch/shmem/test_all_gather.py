@@ -18,20 +18,20 @@ import os
 
 from tests.common.mark_utils import arg_mark
 from tests.common.port_utils import allocate_port
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import prepare_multicore_test_environment
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import prepare_multicore_test_environment
 
 
 _WORKER = os.path.join(os.path.dirname(__file__), "_test_all_gather.py")
 
 
-def _run(case_name: str, num_proc: int) -> None:
+def _run(case_name: str, num_proc: int, *, num_devices: int | None = None) -> None:
     prepare_multicore_test_environment()
-    run_multicore_case(_WORKER, case_name, num_proc=num_proc, timeout=None)
+    run_multicore_case(_WORKER, case_name, num_proc=num_proc, timeout=1200, num_devices=num_devices)
 
 
 def _set_unique_bootstrap_endpoint(monkeypatch) -> None:
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
 
 
 def _run_boundary_matrix(monkeypatch, rank_count: int) -> None:
@@ -128,4 +128,4 @@ def test_all_gather_symmetric_view_preserves_guards(monkeypatch) -> None:
 def test_runtime_device_guard_on_real_npu(monkeypatch) -> None:
     """Run the Runtime device-drift guard on a host with at least two NPUs."""
     _set_unique_bootstrap_endpoint(monkeypatch)
-    _run("test_runtime_device_guard_on_real_npu", num_proc=1)
+    _run("test_runtime_device_guard_on_real_npu", num_proc=1, num_devices=2)

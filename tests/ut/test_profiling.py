@@ -22,21 +22,21 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import DiagnosticSpec, build_graph_metadata
-from hyper_parallel.core.multicore.diagnostics.common.runtime import PreparedDiagnosticRuntime
-from hyper_parallel.core.multicore.diagnostics.profiler.cycle_trace import (
+from hyper_multicore.diagnostics.common.graph import DiagnosticSpec, build_graph_metadata
+from hyper_multicore.diagnostics.common.runtime import PreparedDiagnosticRuntime
+from hyper_multicore.diagnostics.profiler.cycle_trace import (
     GRAPH_STAGE_DESC_BASE, MAX_PROFILE_BUFFER_BYTES, _PreparedProfileRuntime,
     _calculate_profile_layout, _configure_trace_metadata, _resolve_cycle_frequency_mhz,
 )
-from hyper_parallel.core.multicore.scheduler.config import EVENT_INVALID_ID, RuntimeConfigC, TaskDescC, TaskType
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
-from hyper_parallel.core.multicore.diagnostics import prepare_mega_kernel_diagnostics
-from hyper_parallel.core.multicore.modules.mega_gate.diagnostics import (
+from hyper_multicore.scheduler.config import EVENT_INVALID_ID, RuntimeConfigC, TaskDescC, TaskType
+from hyper_multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.diagnostics import prepare_mega_kernel_diagnostics
+from hyper_multicore.modules.mega_gate.diagnostics import (
     MEGA_GATE_ROUTE_STAGE_NAMES, MEGA_GATE_ROUTE_GRAD_STAGE_NAMES, MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES,
     bind_pipeline_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_gate.plan import (
+from hyper_multicore.modules.mega_gate.plan import (
     MEGA_GATE_AIV_WORKER_CAPACITY, MEGA_GATE_ROUTE_TASK_TYPES, MEGA_GATE_ROUTE_GRAD_TASK_TYPES,
     MEGA_GATE_ROUTE_GRAD_K1_TASK_TYPES, _build_pipeline_runtime_config, build_mega_gate_plan,
 )
@@ -284,19 +284,19 @@ class TestMegaKernelProfileLayout(unittest.TestCase):
 
                 with (
                     patch(
-                        "hyper_parallel.core.multicore.modules.mega_gate.plan.dist.is_initialized",
+                        "hyper_multicore.modules.mega_gate.plan.dist.is_initialized",
                         return_value=initialized,
                     ),
                     patch(
-                        "hyper_parallel.core.multicore.modules.mega_gate.plan.dist.get_rank",
+                        "hyper_multicore.modules.mega_gate.plan.dist.get_rank",
                         return_value=3,
                     ) as get_rank,
                     patch(
-                        "hyper_parallel.core.multicore.modules.mega_gate.plan.prepare_mega_kernel_diagnostics",
+                        "hyper_multicore.modules.mega_gate.plan.prepare_mega_kernel_diagnostics",
                         side_effect=prepare_runtime,
                     ),
                     patch(
-                        "hyper_parallel.core.multicore.modules.mega_gate.plan.torch.zeros",
+                        "hyper_multicore.modules.mega_gate.plan.torch.zeros",
                         return_value=object(),
                     ),
                 ):

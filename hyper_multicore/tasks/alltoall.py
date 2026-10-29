@@ -16,13 +16,13 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TaskDescC, TensorDescC, RuntimeConfigC,
     TaskAiCoreType, TaskType, TaskSplitValue,
 )
-from hyper_parallel.core.multicore.scheduler.graph import OperatorNode
-from hyper_parallel.core.multicore.tasks.task_base import FillConfig
-from hyper_parallel.core.multicore.tasks.utils import (
+from hyper_multicore.scheduler.graph import OperatorNode
+from hyper_multicore.tasks.task_base import FillConfig
+from hyper_multicore.tasks.utils import (
     advance_tsv_vector, advance_tsv_vector_only,
 )
 

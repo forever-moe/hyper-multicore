@@ -24,9 +24,9 @@ import torch
 import torch.distributed as dist
 import torch_npu  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler, schedule as diagnostic_schedule
-from hyper_parallel.core.multicore import MegaMoeExperts
-from tests.torch.multicore import _test_mega_moe as common
+from hyper_multicore.diagnostics import profiler as multicore_profiler, schedule as diagnostic_schedule
+from hyper_multicore import MegaMoeExperts
+from tests.torch import _test_mega_moe as common
 
 
 _PROFILE_SHAPE = common.MoeShape(

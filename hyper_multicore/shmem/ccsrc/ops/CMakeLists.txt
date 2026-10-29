@@ -8,10 +8,10 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.18)
-project(hyper_parallel_shmem_ops)
+project(hyper_multicore_shmem_ops)
 
 # Build the SHMEM op device kernels and their host launchers into one fat
-# kernel library (libhyper_parallel_shmem_ops.so). The exposed interface is
+# kernel library (libhyper_multicore_shmem_ops.so). The exposed interface is
 # POD-only (see ccsrc/ops/include/shmem_kernel.h); the host launcher is
 # compiled with ABI=0 so both ABI variants of framework wrappers can link it.
 
@@ -119,15 +119,15 @@ hp_enable_compile_hardening(all_gather_host)
 
 # Fat kernel library: device objects + host launcher, linked against the
 # private SHMEM SDK libraries staged by the sdk phase.
-add_library(hyper_parallel_shmem_ops SHARED
+add_library(hyper_multicore_shmem_ops SHARED
     $<TARGET_OBJECTS:all_gather_kernel>
     $<TARGET_OBJECTS:all_gather_host>
 )
-target_link_options(hyper_parallel_shmem_ops PRIVATE --cce-fatobj-link)
-target_link_libraries(hyper_parallel_shmem_ops PRIVATE hyper_parallel_shmem)
-hp_enable_link_hardening(hyper_parallel_shmem_ops)
+target_link_options(hyper_multicore_shmem_ops PRIVATE --cce-fatobj-link)
+target_link_libraries(hyper_multicore_shmem_ops PRIVATE hyper_multicore_shmem)
+hp_enable_link_hardening(hyper_multicore_shmem_ops)
 
-install(TARGETS hyper_parallel_shmem_ops LIBRARY DESTINATION lib)
+install(TARGETS hyper_multicore_shmem_ops LIBRARY DESTINATION lib)
 # Stage the private SHMEM SDK libraries next to the kernel library so the
 # install tree is self-contained even when the legacy ops phase is removed.
 file(GLOB SHMEM_SO_FILES "${SHMEM_HOME_PATH}/shmem/lib/*")

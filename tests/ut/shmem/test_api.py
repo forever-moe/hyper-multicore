@@ -18,7 +18,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from hyper_parallel.core.multicore.shmem import _api, _debug
+from hyper_multicore.shmem import _api, _debug
 
 
 class _Tensor:

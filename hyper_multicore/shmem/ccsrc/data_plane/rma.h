@@ -15,7 +15,7 @@
 #include "cann/device.h"
 #include "data_plane/sync.h"
 
-namespace hyper_parallel::multicore::shmem::data_plane {
+namespace hyper_multicore::shmem::data_plane {
 
 /**
  * @brief Translate one local symmetric GM address to the corresponding address on a target Root PE.
@@ -130,4 +130,4 @@ __aicore__ inline void get_pipelined(GM_ADDR destination, GM_ADDR source, int64_
   AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
 }
 
-}  // namespace hyper_parallel::multicore::shmem::data_plane
+}  // namespace hyper_multicore::shmem::data_plane

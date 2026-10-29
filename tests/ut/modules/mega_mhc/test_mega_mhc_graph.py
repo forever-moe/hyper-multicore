@@ -16,14 +16,14 @@
 
 import unittest
 
-from hyper_parallel.core.multicore.modules.mega_mhc.graph import (
+from hyper_multicore.modules.mega_mhc.graph import (
     POST_DONE_EVENT,
     build_event_layout,
     build_mega_mhc_graph,
     resolve_token_tile,
 )
-from hyper_parallel.core.multicore.scheduler.builder import build_runtime_config
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.builder import build_runtime_config
+from hyper_multicore.scheduler.config import (
     ATOMIC_ADD_VALUE_LEN,
     MIN_EVENT_CAPACITY,
     TaskAiCoreType,

@@ -24,8 +24,10 @@ __all__ = [
 import importlib
 from typing import Any, Final
 
+from hyper_multicore._loader import require_multicore_environment, validate_native_compatibility
 
-_NATIVE_MODULE: Final = "hyper_parallel_shmem_torch"
+
+_NATIVE_MODULE: Final = "hyper_multicore_shmem_torch"
 
 _native: Any | None = None
 
@@ -35,6 +37,8 @@ def _load_native() -> Any:
     global _native  # pylint: disable=global-statement
 
     if _native is None:
+        require_multicore_environment()
+        validate_native_compatibility()
         native = importlib.import_module(_NATIVE_MODULE)
         _native = native
     return _native

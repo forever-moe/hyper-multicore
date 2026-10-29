@@ -1,95 +1,24 @@
-# --- Build & Install ---
-build/
-output/
-dist/
-*.egg-info/
-*.ir
-st_tests
-kernel_meta/
-somas_meta/
-trace_code_graph_*
-3rdparty/shmem
-vendors/
-
-# Protocol buffers
-*_pb2.py
-*.pb.h
-*.pb.cc
-*.pb
-*_grpc.py
-
-# --- Python ---
-*__pycache__*
-.pytest_cache
+__pycache__/
 *.py[cod]
-*.whl
+.pytest_cache/
+.mypy_cache/
 .venv/
 venv/
-.ipynb_checkpoints/
-
-# Test results
-*.dot
-*.dat
-*.svg
-!hyper_parallel/rl/docs/images/agentic_rl_architecture.svg
-*.perf
-*.info
-*.ckpt
-*.shp
-*.pkl
-*.pb
-*.log
-.clangd
-
-# Dynamic libraries
+build/
+dist/
+*.egg-info/
+hyper_multicore/build_info.json
 *.so
 *.so.*
+*.pyd
 *.dylib
-
-# Static libraries
-*.la
-*.lai
+*.dll
 *.a
 *.lib
-# the solver writes one of these per problem into the folder a test runs from
-*.lp
-
-# --- IDE & System ---
+*.o
+*.log
+logs/
 .idea/
 .vscode/
-.trae/
-# where a coding assistant reads skills from, which install.py may link into
-.claude/
-.agents/
 .DS_Store
-*.swp
-
-# tools
-.omo/
-
-# SAPP-ND generated files
-hyper_parallel/auto_parallel/SAPP-ND/plots/
-hyper_parallel/auto_parallel/SAPP-ND/memory_estimation/plots/
-hyper_parallel/auto_parallel/SAPP-ND/memory_estimation/tests/plots/
-hyper_parallel/auto_parallel/SAPP-ND/memory_estimation/**/*.log
-hyper_parallel/auto_parallel/SAPP-ND/memory_estimation/**/*.csv
-hyper_parallel/auto_parallel/SAPP-ND/paradise/output/
-hyper_parallel/auto_parallel/SAPP-ND/paradise/results/
-hyper_parallel/auto_parallel/SAPP-ND/**/*nd_to_ppb*.json
-
-# NPU graph-fusion debug dump (regenerated in CWD on every NPU run)
 fusion_result.json
-*.xlsx
-
-# Local RL development instructions and generated runtime state
-/hyper_parallel/rl/AGENTS.md
-/hyper_parallel/rl/docs/host_cleanup.local.md
-/hyper_parallel/rl/docker/sandboxfusion/
-/hyper_parallel/rl/.cache/
-/hyper_parallel/rl/.codex/
-/hyper_parallel/rl/checkpoints/
-/hyper_parallel/rl/wandb/
-/hyper_parallel/rl/tests/trial/
-/hyper_parallel/rl/examples/swe_smith/docker/
-# Codegen demo artifact (machine-generated next to the training YAML)
-examples/training_demo/qwen3_moe/generated/

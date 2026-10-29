@@ -22,9 +22,9 @@
 namespace {
 
 using CannLogger = void (*)(int, const char *);
-using hyper_parallel::multicore::shmem::cann::log::ErrorCapture;
-using hyper_parallel::multicore::shmem::cann::log::kErrorDetailCapacity;
-using hyper_parallel::multicore::shmem::runtime::log::Level;
+using hyper_multicore::shmem::cann::log::ErrorCapture;
+using hyper_multicore::shmem::cann::log::kErrorDetailCapacity;
+using hyper_multicore::shmem::runtime::log::Level;
 
 CannLogger g_cann_logger = nullptr;
 std::atomic<int> g_sink_calls{0};
@@ -36,7 +36,7 @@ void check(bool condition, const char *message) {
 }
 
 void test_capture_state() {
-  check(hyper_parallel::multicore::shmem::cann::log::configure() == 0, "logger configuration failed");
+  check(hyper_multicore::shmem::cann::log::configure() == 0, "logger configuration failed");
   check(g_cann_logger != nullptr, "logger callback was not registered");
 
   {
@@ -137,7 +137,7 @@ void test_configured_level(const std::string &configuration) {
 
   HP_SM_LOG_DEBUG(++debug_rank_evaluations, "Test", "Filter", "%d", ++debug_argument_evaluations);
   HP_SM_LOG_INFO(++info_rank_evaluations, "Test", "Filter", "%d", ++info_argument_evaluations);
-  hyper_parallel::multicore::shmem::runtime::log::Line(Level::Error, 0, __FILE__, __LINE__, "Test", "Filter", "error");
+  hyper_multicore::shmem::runtime::log::Line(Level::Error, 0, __FILE__, __LINE__, "Test", "Filter", "error");
 
   check((debug_rank_evaluations == 1) == debug_enabled, "DEBUG rank expression filtering is incorrect");
   check((debug_argument_evaluations == 1) == debug_enabled, "DEBUG argument filtering is incorrect");

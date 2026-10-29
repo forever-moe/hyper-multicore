@@ -22,9 +22,9 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
-from hyper_parallel.core.multicore.scheduler.builder import build_runtime_config
-from hyper_parallel.core.multicore.scheduler.config import _validate_runtime_task_queues
+from hyper_multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
+from hyper_multicore.scheduler.builder import build_runtime_config
+from hyper_multicore.scheduler.config import _validate_runtime_task_queues
 
 from .diagnostics import bind_forward_graph
 from .graph import DEFAULT_TOKEN_TILE, build_mega_mhc_graph, resolve_token_tile

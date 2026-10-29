@@ -12,12 +12,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HYPER_PARALLEL_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_
-#define HYPER_PARALLEL_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_
+#ifndef HYPER_MULTICORE_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_
+#define HYPER_MULTICORE_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_
 
 #include "op_plugin/include/npu_cpp_extension.h"
 
-namespace hyper_parallel::multicore {
+namespace hyper_multicore {
 
 // Construct one static instance per operator; never cache by argument signature alone.
 struct CachedOpApi {
@@ -116,6 +116,6 @@ void execute_cached_op(const CachedOpApi &api, Args &...args) {
   api.uninit_context();
 }
 
-}  // namespace hyper_parallel::multicore
+}  // namespace hyper_multicore
 
-#endif  // HYPER_PARALLEL_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_
+#endif  // HYPER_MULTICORE_CORE_MULTICORE_TORCH_CSRC_CACHED_OP_API_H_

@@ -19,7 +19,7 @@ Counter helpers (advance_tsv_*) mirror the C++ tsv state advancement.
 add_terminate / add_dynamic_data are called from gen_runtime_data after
 the main fill loop.
 """
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TensorDescC, TaskDescC, RuntimeConfigC,
     TaskType, DynamicType,
     MAX_TENSOR_DIMS,

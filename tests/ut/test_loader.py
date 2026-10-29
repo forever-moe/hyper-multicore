@@ -24,8 +24,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from hyper_parallel.core.multicore import _loader
-from hyper_parallel.core.multicore._loader import NativeComponentUnavailableError
+from hyper_multicore import _loader
+from hyper_multicore._loader import NativeComponentUnavailableError
 from tests.common.mark_utils import arg_mark
 
 class TestMulticoreNative(unittest.TestCase):
@@ -35,22 +35,25 @@ class TestMulticoreNative(unittest.TestCase):
         """Create a local native root with one vendor and the Torch adapter directory."""
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root)
-        self.native_root = self.root / "hyper_parallel" / "core" / "multicore" / "lib"
+        self.native_root = self.root / "hyper_multicore" / "lib"
         self.vendor_root = (
-            self.native_root / "vendors" / "hyper_parallel_multicore_nn"
+            self.native_root / "vendors" / "hyper_multicore_nn"
         )
         library = self.vendor_root / "op_api" / "lib" / "libcust_opapi.so"
         library.parent.mkdir(parents=True)
         library.write_bytes(b"vendor")
         adapter = (
             self.native_root / "framework" / "torch"
-            / "libhyper_parallel_mega_moe_torch.so"
+            / "libhyper_multicore_mega_moe_torch.so"
         )
         adapter.parent.mkdir(parents=True)
         adapter.write_bytes(b"adapter")
-        (adapter.parent / "libhyper_parallel_mega_gate_torch.so").write_bytes(b"adapter")
+        (adapter.parent / "libhyper_multicore_mega_gate_torch.so").write_bytes(b"adapter")
         self.shmem_root = self.native_root.parent / "shmem" / "lib"
         (self.shmem_root / "shmem").mkdir(parents=True)
+        identity = patch.object(_loader, "validate_native_compatibility")
+        identity.start()
+        self.addCleanup(identity.stop)
 
     def test_vendor_preload_keeps_dependency_symbols_local(self) -> None:
         """Load the exact vendor locally and preserve the cause of any load failure."""
@@ -84,14 +87,14 @@ class TestMulticoreNative(unittest.TestCase):
         ), patch.object(_loader, "sys", SimpleNamespace(modules={})):
             vendor_root, default_adapter = _loader.get_multicore_paths()
             _, gate_adapter = _loader.get_multicore_adapter_path(
-                "hyper_parallel_mega_gate_torch"
+                "hyper_multicore_mega_gate_torch"
             )
             opp_value = os.environ["ASCEND_CUSTOM_OPP_PATH"]
             library_value = os.environ["LD_LIBRARY_PATH"]
 
         self.assertEqual(vendor_root, self.vendor_root.resolve())
-        self.assertEqual(default_adapter.name, "libhyper_parallel_mega_moe_torch.so")
-        self.assertEqual(gate_adapter.name, "libhyper_parallel_mega_gate_torch.so")
+        self.assertEqual(default_adapter.name, "libhyper_multicore_mega_moe_torch.so")
+        self.assertEqual(gate_adapter.name, "libhyper_multicore_mega_gate_torch.so")
         self.assertEqual(opp_value, environment["ASCEND_CUSTOM_OPP_PATH"])
         self.assertEqual(library_value, environment["LD_LIBRARY_PATH"])
 

@@ -24,17 +24,17 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.diagnostics.common.session import (
+from hyper_multicore.diagnostics.common.session import (
     _activate_session,
     _deactivate_session,
 )
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments, LaunchContext
-from hyper_parallel.core.multicore.diagnostics.common.schedule import DiagnosticAction
-from hyper_parallel.core.multicore.diagnostics.dump.layout import _SAFE_FILE_NAME, _stage_names
-from hyper_parallel.core.multicore.diagnostics.dump.l0 import (
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments, LaunchContext
+from hyper_multicore.diagnostics.common.schedule import DiagnosticAction
+from hyper_multicore.diagnostics.dump.layout import _SAFE_FILE_NAME, _stage_names
+from hyper_multicore.diagnostics.dump.l0 import (
     _GraphTensor, _TensorSnapshot, _describe_graph_tensors, _snapshot_tensor, _write_l0_stage_files,
 )
-from hyper_parallel.core.multicore.diagnostics.dump.l1 import (
+from hyper_multicore.diagnostics.dump.l1 import (
     _L1Snapshot,
     _PreparedL1Dump,
     _decode_l1_dump,

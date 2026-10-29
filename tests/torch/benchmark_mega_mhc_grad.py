@@ -23,11 +23,11 @@ from typing import Any
 import torch
 import torch_npu  # noqa: F401  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.common import (
+from hyper_multicore.modules.mega_mhc_grad.common import (
     MegaMhcGradCache,
     MegaMhcGradOutputs,
 )
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.function import hyper_mega_mhc_grad
+from hyper_multicore.modules.mega_mhc_grad.function import hyper_mega_mhc_grad
 from tests.common.multicore.mega_mhc_grad_golden import (
     make_cann_grad_cache,
     torch_mega_mhc_grad,

@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <string>
 
-namespace hyper_parallel::multicore::shmem {
+namespace hyper_multicore::shmem {
 
 /** @brief Framework-independent NPU models recognized by the symmetric-memory component. */
 enum class DeviceModel : uint8_t {
@@ -29,4 +29,4 @@ struct DeviceIdentity {
   std::string soc_name;
 };
 
-}  // namespace hyper_parallel::multicore::shmem
+}  // namespace hyper_multicore::shmem

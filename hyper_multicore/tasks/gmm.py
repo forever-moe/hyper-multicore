@@ -16,13 +16,13 @@
 from dataclasses import dataclass, field
 from typing import Set
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TaskDescC, TensorDescC, RuntimeConfigC,
     TaskAiCoreType, TaskType,
     MAX_TENSOR_DIMS,
 )
-from hyper_parallel.core.multicore.tasks.task_base import FillConfig
-from hyper_parallel.core.multicore.tasks.utils import (
+from hyper_multicore.tasks.task_base import FillConfig
+from hyper_multicore.tasks.utils import (
     advance_tsv_cube, advance_tsv_cube_only,
 )
 

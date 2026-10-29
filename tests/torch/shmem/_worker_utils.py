@@ -20,7 +20,7 @@ import torch
 import torch.distributed as dist
 import torch_npu  # noqa: F401  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore import shmem
+from hyper_multicore import shmem
 
 
 ACQUIRE_HINT = "Call shmem.acquire() before using SHMEM capabilities"

@@ -23,18 +23,18 @@ from unittest.mock import Mock, patch
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_moe import workspace as workspace_module
-from hyper_parallel.core.multicore.modules.mega_moe.heap_manager import _HeapManager, _workspace_layout
-from hyper_parallel.core.multicore.modules.mega_moe.spec import (
+from hyper_multicore.modules.mega_moe import workspace as workspace_module
+from hyper_multicore.modules.mega_moe.heap_manager import _HeapManager, _workspace_layout
+from hyper_multicore.modules.mega_moe.spec import (
     _resolve_receive_capacity,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.workspace import (
+from hyper_multicore.modules.mega_moe.workspace import (
     _WORKSPACE_ALIGNMENT,
     MegaMoeWorkspace,
     _spec_workspace_bytes,
     _workspace_allocation_specs,
 )
-from hyper_parallel.core.multicore.scheduler.config import event_workspace_bytes
+from hyper_multicore.scheduler.config import event_workspace_bytes
 from tests.common.mark_utils import arg_mark
 
 
@@ -130,7 +130,7 @@ class TestMegaMoeWorkspaceSizing(unittest.TestCase):
                 "ep_size": 4, "initial_capacity_factor": 4.0}
         reference = torch.empty(0, dtype=torch.bfloat16)
         for mib, error in ((1602, None), (1664, None), (1600, RuntimeError), (1603, ValueError), (0, ValueError)):
-            with self.subTest(mib=mib), patch.dict(os.environ, {"HYPER_PARALLEL_SHMEM_HEAP_SIZE": str(mib * 1024**2)}):
+            with self.subTest(mib=mib), patch.dict(os.environ, {"HYPER_MULTICORE_SHMEM_HEAP_SIZE": str(mib * 1024**2)}):
                 if error is None:
                     manager = _HeapManager(None, reference)
                     manager.reserve(((spec, _workspace_layout(spec, reference.dtype)),), allow_resize=True)

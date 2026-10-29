@@ -54,9 +54,9 @@ PermuteOutputs permute_npu(const at::Tensor &tokens, const at::Tensor &indices, 
   if (indices.numel() != 0) {
     int64_t num_out_tokens = indices.numel();
     bool padded_mode = false;
-    static const hyper_parallel::multicore::CachedOpApi api("aclnnMoeTokenPermute",
+    static const hyper_multicore::CachedOpApi api("aclnnMoeTokenPermute",
                                                             "aclnnMoeTokenPermuteGetWorkspaceSize");
-    hyper_parallel::multicore::execute_cached_op(api, tokens, indices, num_out_tokens, padded_mode, output, mapping);
+    hyper_multicore::execute_cached_op(api, tokens, indices, num_out_tokens, padded_mode, output, mapping);
   }
   return {output, mapping};
 }
@@ -69,6 +69,6 @@ PermuteOutputs permute_meta(const at::Tensor &tokens, const at::Tensor &indices,
 
 }  // namespace
 
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) { m.impl("moe_token_permute_out", &permute_npu); }
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) { m.impl("moe_token_permute_out", &permute_npu); }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) { m.impl("moe_token_permute_out", &permute_meta); }
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) { m.impl("moe_token_permute_out", &permute_meta); }

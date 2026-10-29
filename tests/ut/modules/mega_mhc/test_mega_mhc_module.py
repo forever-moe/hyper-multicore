@@ -18,7 +18,7 @@ import unittest
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_mhc.module import HyperMegaMhc
+from hyper_multicore.modules.mega_mhc.module import HyperMegaMhc
 from tests.common.mark_utils import arg_mark
 from tests.common.multicore.mega_mhc_golden import torch_mega_mhc
 

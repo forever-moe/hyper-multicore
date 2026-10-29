@@ -33,12 +33,12 @@ from torch import (
 )
 from torch.testing import assert_close
 
-from hyper_parallel.core.multicore.diagnostics.dump import api as tensor_dump
-from hyper_parallel.core.multicore.diagnostics.dump import l1 as tensor_dump_l1
-from hyper_parallel.core.multicore.diagnostics.common.session import _reset_active_session_for_test
-from hyper_parallel.core.multicore.scheduler.config import TaskAiCoreType, TaskType
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec, TensorSpec
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config, serialize_runtime_config
+from hyper_multicore.diagnostics.dump import api as tensor_dump
+from hyper_multicore.diagnostics.dump import l1 as tensor_dump_l1
+from hyper_multicore.diagnostics.common.session import _reset_active_session_for_test
+from hyper_multicore.scheduler.config import TaskAiCoreType, TaskType
+from hyper_multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec, TensorSpec
+from hyper_multicore.scheduler.runtime import allocate_runtime_config, serialize_runtime_config
 from tests.common.mark_utils import arg_mark
 
 

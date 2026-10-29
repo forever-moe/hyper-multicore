@@ -26,11 +26,11 @@ To register a new operator type:
 """
 from typing import Dict, Type
 
-from hyper_parallel.core.multicore.scheduler.graph import OpType
-from hyper_parallel.core.multicore.tasks.task_base import FillConfig
-from hyper_parallel.core.multicore.tasks.alltoall import AllToAllFillConfig
-from hyper_parallel.core.multicore.tasks.gmm import GmmFillConfig
-from hyper_parallel.core.multicore.tasks.swiglu import SwiGLUFillConfig
+from hyper_multicore.scheduler.graph import OpType
+from hyper_multicore.tasks.task_base import FillConfig
+from hyper_multicore.tasks.alltoall import AllToAllFillConfig
+from hyper_multicore.tasks.gmm import GmmFillConfig
+from hyper_multicore.tasks.swiglu import SwiGLUFillConfig
 
 FILL_CONFIG_REGISTRY: Dict[OpType, Type[FillConfig]] = {
     OpType.ALLTOALL:    AllToAllFillConfig,

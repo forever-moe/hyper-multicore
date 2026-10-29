@@ -19,7 +19,7 @@
 #include <system_error>
 #include <utility>
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 namespace {
 
 constexpr std::string_view kTcpScheme = "tcp://";
@@ -139,4 +139,4 @@ Result<Config> LoadConfigFromEnvironment() {
   return ParseConfig(input);
 }
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

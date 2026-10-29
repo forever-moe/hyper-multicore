@@ -59,9 +59,9 @@ UnpermuteOutputs unpermute_grad_npu(const at::Tensor &tokens, const at::Tensor &
   auto contiguous_grad = grad.contiguous();
   const c10::optional<at::IntArrayRef> restore_shape = c10::nullopt;
   bool padded_mode = false;
-  static const hyper_parallel::multicore::CachedOpApi api(
+  static const hyper_multicore::CachedOpApi api(
       "aclnnMoeTokenUnpermuteGrad", "aclnnMoeTokenUnpermuteGradGetWorkspaceSize");
-  hyper_parallel::multicore::execute_cached_op(
+  hyper_multicore::execute_cached_op(
       api, tokens, contiguous_grad, indices, probs, padded_mode, restore_shape, grad_tokens, grad_probs);
   return {grad_tokens, grad_probs};
 }
@@ -74,6 +74,6 @@ UnpermuteOutputs unpermute_grad_meta(const at::Tensor &tokens, const at::Tensor 
 
 }  // namespace
 
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) { m.impl("mega_moe_unpermute_grad_out", &unpermute_grad_npu); }
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) { m.impl("mega_moe_unpermute_grad_out", &unpermute_grad_npu); }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) { m.impl("mega_moe_unpermute_grad_out", &unpermute_grad_meta); }
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) { m.impl("mega_moe_unpermute_grad_out", &unpermute_grad_meta); }

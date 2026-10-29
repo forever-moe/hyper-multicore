@@ -17,8 +17,8 @@
 from pathlib import Path
 
 from tests.common.mark_utils import arg_mark
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import (
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import (
     multicore_adapter_is_available,
     prepare_multicore_test_environment,
     without_inherited_rank_environment,
@@ -30,8 +30,8 @@ _WORKER = str(Path(__file__).resolve().parent / "_test_mega_gate.py")
 def _run_worker(case: str) -> None:
     """Run one MegaGate module worker on one NPU."""
     prepare_multicore_test_environment()
-    if not multicore_adapter_is_available("hyper_parallel_mega_gate_torch"):
-        raise RuntimeError("MegaGate ST requires a wheel or PYTHONPATH payload built with --multicore on")
+    if not multicore_adapter_is_available("hyper_multicore_mega_gate_torch"):
+        raise RuntimeError("MegaGate ST requires a wheel or PYTHONPATH payload built with bash build.sh")
     with without_inherited_rank_environment():
         run_multicore_case(_WORKER, case, num_proc=1)
 

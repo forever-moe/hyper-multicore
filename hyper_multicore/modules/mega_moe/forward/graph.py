@@ -14,12 +14,12 @@
 # ============================================================================
 """MoE-FFN forward compute graph."""
 
-from hyper_parallel.core.multicore.scheduler.graph import (
+from hyper_multicore.scheduler.graph import (
     ComputeGraph, OperatorNode, TensorSpec, SplitSpec, OpType,
 )
-from hyper_parallel.core.multicore.tasks.alltoall import AllToAllFillConfig, AllToAllType
-from hyper_parallel.core.multicore.tasks.gmm import GmmFillConfig
-from hyper_parallel.core.multicore.tasks.swiglu import SwiGLUFillConfig
+from hyper_multicore.tasks.alltoall import AllToAllFillConfig, AllToAllType
+from hyper_multicore.tasks.gmm import GmmFillConfig
+from hyper_multicore.tasks.swiglu import SwiGLUFillConfig
 
 # Tiling buffer positions in the C++ runtime descriptor array.
 _TILING_POS_UP_PROJ = 17

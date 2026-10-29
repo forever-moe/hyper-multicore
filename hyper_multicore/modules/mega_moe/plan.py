@@ -23,34 +23,34 @@ import numpy as np
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
-from hyper_parallel.core.multicore.modules.mega_moe.backward.gen_runtime_data import (
+from hyper_multicore.diagnostics import MegaKernelDiagnostics, prepare_mega_kernel_diagnostics
+from hyper_multicore.modules.mega_moe.backward.gen_runtime_data import (
     build_config_for_rank as build_backward_config,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.backward.graph import (
+from hyper_multicore.modules.mega_moe.backward.graph import (
     build_backward_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.backward.storage import can_reuse_backward_dispatch
-from hyper_parallel.core.multicore.modules.mega_moe.backward.tiling_tables import (
+from hyper_multicore.modules.mega_moe.backward.storage import can_reuse_backward_dispatch
+from hyper_multicore.modules.mega_moe.backward.tiling_tables import (
     get_act_grad_tiling_bytes,
     get_gate_grad_tiling_bytes,
     get_swiglu_grad_tiling_bytes,
     get_w1_grad_tiling_bytes,
     get_w2_grad_tiling_bytes,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.gen_runtime_data import (
+from hyper_multicore.modules.mega_moe.forward.gen_runtime_data import (
     build_config_for_rank as build_forward_config,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.graph import (
+from hyper_multicore.modules.mega_moe.forward.graph import (
     build_forward_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.tiling_tables import (
+from hyper_multicore.modules.mega_moe.forward.tiling_tables import (
     get_down_proj_tiling_bytes,
     get_swiglu_tiling_bytes,
     get_up_proj_tiling_bytes,
 )
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph
+from hyper_multicore.scheduler.config import TaskSplitValue
+from hyper_multicore.scheduler.graph import ComputeGraph
 
 from .diagnostics import _mega_moe_owner_options
 from .spec import MegaMoeSpec

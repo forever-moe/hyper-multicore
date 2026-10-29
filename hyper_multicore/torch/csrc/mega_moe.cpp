@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  *
- * PyTorch TORCH_LIBRARY_IMPL for hyper_parallel::mega_moe.
+ * PyTorch TORCH_LIBRARY_IMPL for hyper_multicore::mega_moe.
  *
  * NPU implementation calls aclnnHyperMegaMoe via the cached public
  * torch_npu extension bridge, which handles:
@@ -52,9 +52,9 @@ FwdReturn mega_moe_npu(
     int64_t expert_num,
     int64_t hidden_size,
     int64_t seq_size) {
-    static const hyper_parallel::multicore::CachedOpApi api(
+    static const hyper_multicore::CachedOpApi api(
         "aclnnHyperMegaMoe", "aclnnHyperMegaMoeGetWorkspaceSize");
-    hyper_parallel::multicore::execute_cached_op(api,
+    hyper_multicore::execute_cached_op(api,
         dispatch_target, dispatch_target_off,
         dispatch_src, dispatch_src_off, dispatch_size,
         up_proj_weight, up_proj_glist,
@@ -106,11 +106,11 @@ FwdReturn mega_moe_meta(
 }  // namespace
 
 // NPU (Ascend) device
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) {
     m.impl("mega_moe", &mega_moe_npu);
 }
 
 // Meta device (for shape tracing without actual compute)
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) {
     m.impl("mega_moe", &mega_moe_meta);
 }

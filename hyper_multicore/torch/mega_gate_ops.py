@@ -21,18 +21,18 @@ from functools import lru_cache
 import torch
 import torch_npu  # pylint: disable=unused-import  # Registers NPU dispatch.
 
-from hyper_parallel.core.multicore._loader import (
+from hyper_multicore._loader import (
     NativeComponentUnavailableError,
     get_multicore_adapter_path,
     preload_vendor_library,
 )
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics
+from hyper_multicore.diagnostics import MegaKernelDiagnostics
 
 
 @lru_cache(maxsize=1)
 def _load_native() -> None:
     """Load the MegaGate ABI adapter on the first native call."""
-    vendor_root, adapter_path = get_multicore_adapter_path("hyper_parallel_mega_gate_torch")
+    vendor_root, adapter_path = get_multicore_adapter_path("hyper_multicore_mega_gate_torch")
     preload_vendor_library(vendor_root)
     try:
         torch.ops.load_library(str(adapter_path))
@@ -87,11 +87,11 @@ def _mega_gate_route(
         )
         parameters = (logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer, *outputs)
         with diagnostics.launch(parameters, direction="forward") as call:
-            return torch.ops.hyper_parallel.mega_gate_route_out(
+            return torch.ops.hyper_multicore.mega_gate_route_out(
                 logits, text_bias, vision_bias, image_mask, call.runtime_config, call.diagnostic_buffer,
                 *outputs, top_k, routed_scaling_factor, use_vision_bias,
             )
-    return torch.ops.hyper_parallel.mega_gate_route(
+    return torch.ops.hyper_multicore.mega_gate_route(
         logits,
         text_bias,
         vision_bias,
@@ -122,7 +122,7 @@ def _mega_gate_route_grad(
     All tensors are borrowed, contiguous, and complete in current-stream order.
     """
     _load_native()
-    return torch.ops.hyper_parallel.mega_gate_route_grad(
+    return torch.ops.hyper_multicore.mega_gate_route_grad(
         logits,
         route_scores,
         selected_scores,

@@ -19,8 +19,8 @@ import os
 import torch
 import torch_npu  # noqa: F401  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore.modules.mega_mhc.function import _hyper_mega_mhc_forward
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.function import hyper_mega_mhc_grad
+from hyper_multicore.modules.mega_mhc.function import _hyper_mega_mhc_forward
+from hyper_multicore.modules.mega_mhc_grad.function import hyper_mega_mhc_grad
 
 
 def _make_case(seed: int) -> tuple[tuple[torch.Tensor, ...], tuple[torch.Tensor, ...]]:

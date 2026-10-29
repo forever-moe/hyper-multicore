@@ -25,11 +25,11 @@ from unittest.mock import patch
 import torch
 from torch.utils.checkpoint import checkpoint
 
-from hyper_parallel.core.multicore import MegaMoeExperts, shmem
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler, schedule
-from hyper_parallel.core.multicore.torch import ops
-from tests.torch.multicore import _test_mega_moe as baseline
-from tests.torch.multicore._mega_moe_utils import start_shmem_lifetime, write_evidence
+from hyper_multicore import MegaMoeExperts, shmem
+from hyper_multicore.diagnostics import profiler as multicore_profiler, schedule
+from hyper_multicore.torch import ops
+from tests.torch import _test_mega_moe as baseline
+from tests.common.multicore._mega_moe_utils import start_shmem_lifetime, write_evidence
 
 
 def _check_strided_layer(layer: MegaMoeExperts, common: torch.nn.Module, shape: baseline.MoeShape) -> None:
@@ -75,7 +75,7 @@ def test_mega_moe_model_replacement_and_layouts() -> None:
     Description: Replace a collected model with a larger push or pull model and use strided activations and weights.
     Expectation: Retained heaps grow and all outputs, original-parameter gradients and updates match common EP.
     """
-    os.environ.pop("HYPER_PARALLEL_SHMEM_HEAP_SIZE", None)
+    os.environ.pop("HYPER_MULTICORE_SHMEM_HEAP_SIZE", None)
     records = []
     for mode in ("push", "pull"):
         start_shmem_lifetime()
@@ -260,7 +260,7 @@ def test_mega_moe_heap_growth() -> None:
     Description: Grow between two forwards, then reverse and repeat both backwards.
     Expectation: All outputs and gradients match common EP; stale storage is invalidated.
     """
-    os.environ.pop("HYPER_PARALLEL_SHMEM_HEAP_SIZE", None)
+    os.environ.pop("HYPER_MULTICORE_SHMEM_HEAP_SIZE", None)
     start_shmem_lifetime()
     shape = baseline.MoeShape(local_num_tokens=4096, hidden_size=1024)
     mega, common = baseline.new_layers(shape, initial_capacity_factor=1.0, capacity_growth_factor=2.0)

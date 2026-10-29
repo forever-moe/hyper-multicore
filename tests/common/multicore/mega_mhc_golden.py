@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_mhc_common import (
+from hyper_multicore.modules.mega_mhc_common import (
     MHC_SINKHORN_ITERS,
     MHC_STREAMS,
     MegaMhcOutputs,
@@ -188,7 +188,7 @@ def cann_mega_mhc(
     if not residual.is_npu or residual.dtype != torch.bfloat16:
         raise TypeError("cann_mega_mhc requires BF16 NPU activations.")
     # Native CANN bindings are optional for the CPU Torch reference.
-    from hyper_parallel.core.multicore.torch import ops as multicore_ops  # pylint: disable=C0415
+    from hyper_multicore.torch import ops as multicore_ops  # pylint: disable=C0415
     leading_shape = residual.shape[:-2]
     hidden_size = residual.shape[-1]
     token_count = residual.numel() // (MHC_STREAMS * hidden_size)

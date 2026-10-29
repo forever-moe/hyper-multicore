@@ -19,10 +19,10 @@ from __future__ import annotations
 from math import prod
 from typing import Any
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TaskType,
 )
-from hyper_parallel.core.multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
+from hyper_multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
 
 
 def _group_counts(context: L1TensorViewContext) -> tuple[int, int, int]:

@@ -21,12 +21,12 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchContext
-from hyper_parallel.core.multicore.diagnostics.common.graph import DiagnosticSpec, GraphDiagnosticMetadata
-from hyper_parallel.core.multicore.diagnostics.common.runtime import PreparedDiagnosticRuntime
-from hyper_parallel.core.multicore.diagnostics.common.session import _get_active_session
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC, TaskDescC
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph, OperatorNode
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchContext
+from hyper_multicore.diagnostics.common.graph import DiagnosticSpec, GraphDiagnosticMetadata
+from hyper_multicore.diagnostics.common.runtime import PreparedDiagnosticRuntime
+from hyper_multicore.diagnostics.common.session import _get_active_session
+from hyper_multicore.scheduler.config import RuntimeConfigC, TaskDescC
+from hyper_multicore.scheduler.graph import ComputeGraph, OperatorNode
 
 
 class MegaKernelDiagnostics:

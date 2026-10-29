@@ -20,7 +20,7 @@ revise_gmm_task_queue_bwd  — Backward GMM1/GMM4 expert interleave in cube_task
 """
 from __future__ import annotations
 
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC, TaskSplitValue
+from hyper_multicore.scheduler.config import RuntimeConfigC, TaskSplitValue
 
 
 def revise_task_queue(cfg: RuntimeConfigC, tsv: TaskSplitValue,

@@ -21,8 +21,8 @@ import unittest
 from unittest.mock import patch
 
 
-from hyper_parallel.core.multicore._loader import NativeComponentUnavailableError
-from hyper_parallel.core.multicore.torch import ops
+from hyper_multicore._loader import NativeComponentUnavailableError
+from hyper_multicore.torch import ops
 
 
 # Registration-cache and alias-ABI checks require Torch's private operator schema and loader.
@@ -60,9 +60,9 @@ class TestTorchOps(unittest.TestCase):
             patch.object(ops, "get_multicore_paths", return_value=(Path("vendor"), Path("good.so"))),
             patch.object(ops, "preload_vendor_library") as preload,
             patch.object(ops.torch.ops, "load_library") as load,
-            patch.object(ops.torch.ops.hyper_parallel, "mega_moe_transport_version",
+            patch.object(ops.torch.ops.hyper_multicore, "mega_moe_transport_version",
                          return_value=1, create=True) as version,
-            patch.object(ops.torch.ops.hyper_parallel, "mega_moe_grad", self._backward_op(), create=True) as backward,
+            patch.object(ops.torch.ops.hyper_multicore, "mega_moe_grad", self._backward_op(), create=True) as backward,
         ):
             ops._load_native()
             ops._load_native()

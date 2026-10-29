@@ -12,7 +12,7 @@
 
 _HP_NATIVE_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 if ! declare -F hp_cann_version_at_least >/dev/null; then
-    source "${_HP_NATIVE_SCRIPT_DIR}/../../../../../scripts/native/cann_version.sh"
+    source "${_HP_NATIVE_SCRIPT_DIR}/../../../scripts/native/cann_version.sh"
 fi
 unset _HP_NATIVE_SCRIPT_DIR
 HP_MINIMUM_CANN_VERSION="9.1.0"
@@ -25,7 +25,7 @@ function hp_prepare_shmem_sdk() {
     local native_root="${project_root}/build/native"
     local python_bin=python
     local locked_source_dir="${native_root}/deps/shmem/src"
-    local wrapper="${project_root}/hyper_parallel/core/multicore/shmem/cmake/shmem_wrapper"
+    local wrapper="${project_root}/hyper_multicore/shmem/cmake/shmem_wrapper"
     local requested_soc
     local -a requested_socs=()
 
@@ -86,7 +86,7 @@ with open(sys.argv[1], encoding="utf-8") as source:
     lock = json.load(source)["components"]["multicore"]["shmem"]
 encoded = json.dumps(lock, sort_keys=True, separators=(",", ":")).encode()
 print(hashlib.sha256(encoded).hexdigest())
-' "${project_root}/hyper_parallel/core/multicore/_build/dependencies.lock.json"); then
+' "${project_root}/hyper_multicore/_build/dependencies.lock.json"); then
         echo "HP_NATIVE_REASON_CODE=SHMEM_LOCK_INVALID"
         echo "ERROR: Cannot read the locked SHMEM dependency contract." >&2
         return 4
@@ -105,9 +105,9 @@ print(hashlib.sha256(encoded).hexdigest())
             "${gcc_path}" --version 2>&1 || true
             "${gxx_path}" --version 2>&1 || true
             sha256sum "${cann_version_file}" \
-                "${project_root}/hyper_parallel/core/multicore/cmake/hardening.cmake" \
-                "${project_root}/hyper_parallel/core/multicore/shmem/cmake/shmem_wrapper/CMakeLists.txt" \
-                "${project_root}/hyper_parallel/core/multicore/shmem/_build/shmem_sdk.sh"
+                "${project_root}/hyper_multicore/cmake/hardening.cmake" \
+                "${project_root}/hyper_multicore/shmem/cmake/shmem_wrapper/CMakeLists.txt" \
+                "${project_root}/hyper_multicore/shmem/_build/shmem_sdk.sh"
         } | sha256sum | awk '{print substr($1, 1, 16)}'
     )
     if [[ ! "${toolchain_key}" =~ ^[0-9a-f]{16}$ ]]; then
@@ -139,7 +139,7 @@ print(hashlib.sha256(encoded).hexdigest())
         esac
     done
 
-    "${python_bin}" "${project_root}/hyper_parallel/core/multicore/_build/prepare_dependencies.py" --dependency shmem
+    "${python_bin}" "${project_root}/hyper_multicore/_build/prepare_dependencies.py" --dependency shmem
     if [[ ! -d "${locked_source_dir}/src" || ! -f "${locked_source_dir}/CMakeLists.txt" ]]; then
         echo "HP_NATIVE_REASON_CODE=SHMEM_SOURCE_NOT_PREPARED"
         echo "ERROR: Pinned SHMEM source is not prepared at ${locked_source_dir}." >&2
@@ -161,7 +161,7 @@ import subprocess
 import sys
 
 project_root, source_dir = (Path(value).resolve() for value in sys.argv[1:])
-lock_path = project_root / "hyper_parallel/core/multicore/_build/dependencies.lock.json"
+lock_path = project_root / "hyper_multicore/_build/dependencies.lock.json"
 lock = json.loads(lock_path.read_text(encoding="utf-8"))["components"]["multicore"]["shmem"]
 environment = os.environ.copy()
 environment["GIT_CEILING_DIRECTORIES"] = str(source_dir.parent)

@@ -22,11 +22,11 @@ import torch
 import torch.distributed as dist
 import torch_npu
 
-from hyper_parallel.components.functional.grouped_matmul import grouped_matmul
-from hyper_parallel.core.multicore import MegaMoeExperts
-from hyper_parallel.core.multicore.scheduler.runtime import RUNTIME_HEADER_BYTES
-from tests.torch.multicore import _test_mega_moe as baseline
-from tests.torch.multicore._mega_moe_utils import (
+from tests.common.multicore.moe_reference import grouped_matmul
+from hyper_multicore import MegaMoeExperts
+from hyper_multicore.scheduler.runtime import RUNTIME_HEADER_BYTES
+from tests.torch import _test_mega_moe as baseline
+from tests.common.multicore._mega_moe_utils import (
     memory_sample,
     start_shmem_lifetime,
     write_evidence,

@@ -23,18 +23,18 @@ from unittest.mock import Mock, patch
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_mhc.plan import MegaMhcPlan
-from hyper_parallel.core.multicore.modules.mega_mhc_common import (
+from hyper_multicore.modules.mega_mhc.plan import MegaMhcPlan
+from hyper_multicore.modules.mega_mhc_common import (
     validate_mega_mhc_hidden_size,
     validate_mega_mhc_native_inputs,
     validate_mega_mhc_tensor,
     validate_mega_mhc_token_count,
 )
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.common import (
+from hyper_multicore.modules.mega_mhc_grad.common import (
     MegaMhcGradCache,
     validate_mega_mhc_grad_tensors,
 )
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.plan import MegaMhcGradPlan
+from hyper_multicore.modules.mega_mhc_grad.plan import MegaMhcGradPlan
 from tests.common.mark_utils import arg_mark
 
 
@@ -204,7 +204,7 @@ class TestMegaMhcInvocationState(unittest.TestCase):
     def _check_invocation_buffers(self, *, backward: bool) -> None:
         """Run two same-plan calls while retaining both live counter buffers."""
         package = "mega_mhc_grad" if backward else "mega_mhc"
-        function = importlib.import_module(f"hyper_parallel.core.multicore.modules.{package}.function")
+        function = importlib.import_module(f"hyper_multicore.modules.{package}.function")
         inputs, cache, buffers = _make_inputs(), _make_cache(), []
         plan = SimpleNamespace(runtime=SimpleNamespace(runtime_config=object(), is_active=False), event_capacity=1024)
 

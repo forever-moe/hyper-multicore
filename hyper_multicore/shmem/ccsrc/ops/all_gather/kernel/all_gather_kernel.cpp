@@ -21,12 +21,12 @@ inline __gm__ struct OpSystemRunCfg g_opSystemRunCfg {
 
 namespace ShmemKernel {
 
-using hyper_parallel::multicore::shmem::data_plane::ChunkPolicy;
-using hyper_parallel::multicore::shmem::data_plane::divide_aligned_capacity;
-using hyper_parallel::multicore::shmem::data_plane::get_chunk;
-using hyper_parallel::multicore::shmem::data_plane::make_chunk_plan;
-using hyper_parallel::multicore::shmem::data_plane::partition_work;
-namespace mte_rma = hyper_parallel::multicore::shmem::data_plane::mte_rma;
+using hyper_multicore::shmem::data_plane::ChunkPolicy;
+using hyper_multicore::shmem::data_plane::divide_aligned_capacity;
+using hyper_multicore::shmem::data_plane::get_chunk;
+using hyper_multicore::shmem::data_plane::make_chunk_plan;
+using hyper_multicore::shmem::data_plane::partition_work;
+namespace mte_rma = hyper_multicore::shmem::data_plane::mte_rma;
 
 class AllGatherKernel {
  public:

@@ -14,6 +14,6 @@
 # ============================================================================
 """Torch test package setup.
 
-Do **not** import ``hyper_parallel`` here — that would pull ``torch`` into
-every pytest launcher under ``tests.torch.*``.
+Keep framework and HyperMulticore imports out of this package initializer.
+Pytest launchers must stay lightweight; device workers import the runtime.
 """

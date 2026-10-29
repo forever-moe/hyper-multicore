@@ -45,7 +45,7 @@ _root_ranks: tuple[int, ...] | None = None
 _device_index: int | None = None
 # Blocks SHMEM access after physical, device, or Root convergence failures.
 _runtime_invalidated = False
-_NATIVE_ERROR_PREFIX = "[HYPER_PARALLEL_SHMEM_ERROR]"
+_NATIVE_ERROR_PREFIX = "[HYPER_MULTICORE_SHMEM_ERROR]"
 _NATIVE_MESSAGE_FIELD = " message="
 _CANN_DETAIL_FIELD = ", cann_detail=["
 _RETRYABLE_RUNTIME_HINT = "The active SHMEM Runtime remains usable."

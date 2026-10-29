@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_mhc_common import (
+from hyper_multicore.modules.mega_mhc_common import (
     MHC_SINKHORN_ITERS,
     validate_mega_mhc_inputs,
 )
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.common import (
+from hyper_multicore.modules.mega_mhc_grad.common import (
     MegaMhcGradCache,
     MegaMhcGradOutputs,
 )
@@ -73,7 +73,7 @@ def make_cann_grad_cache(
         num_iters,
     )
     # Native CANN bindings are optional for the CPU Torch reference.
-    from hyper_parallel.core.multicore.torch import ops as multicore_ops  # pylint: disable=C0415
+    from hyper_multicore.torch import ops as multicore_ops  # pylint: disable=C0415
     hidden_size = residual.shape[-1]
     token_count = residual.numel() // (4 * hidden_size)
     residual_bsnd = residual.reshape(1, token_count, 4, hidden_size).contiguous()

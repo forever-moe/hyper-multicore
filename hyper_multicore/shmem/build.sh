@@ -11,10 +11,10 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../../../.." && pwd)
+PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
 NATIVE_ROOT="${PROJECT_ROOT}/build/native"
 WORK_ROOT="${NATIVE_ROOT}/work/multicore/shmem"
-COMPONENT_ROOT="${NATIVE_ROOT}/components/multicore/hyper_parallel"
+COMPONENT_ROOT="${NATIVE_ROOT}/components/multicore/hyper_multicore"
 SOC_LIST="ascend910b,ascend910_93"
 NATIVE_JOBS="$(nproc)"
 CLEAN="off"
@@ -22,7 +22,7 @@ CLEAN="off"
 function show_help() {
     cat <<EOF
 Usage:
-  bash hyper_parallel/core/multicore/shmem/build.sh [OPTIONS]
+  bash hyper_multicore/shmem/build.sh [OPTIONS]
 
 Options:
   --soc-list VALUE    Comma-separated CANN SoC IDs. Default: ascend910b,ascend910_93.
@@ -99,6 +99,7 @@ done
 if ! [[ "${NATIVE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
     fail "INVALID_SELECTION" "--jobs must be a positive integer, got '${NATIVE_JOBS}'." 2
 fi
+[[ "$(uname -s)" == Linux ]] || fail "UNSUPPORTED_HOST" "Native builds require Linux/CANN/PTA." 3
 
 
 CURRENT_REASON_CODE="SHMEM_BUILD_FAILED"
@@ -114,9 +115,9 @@ trap report_unhandled_error ERR
 
 cd "${PROJECT_ROOT}"
 if [[ "${CLEAN}" == "on" ]]; then
-    rm -rf "${WORK_ROOT}" "${COMPONENT_ROOT}/core/multicore/shmem"
+    rm -rf "${WORK_ROOT}" "${COMPONENT_ROOT}/shmem"
 fi
-rm -rf "${COMPONENT_ROOT}/core/multicore/shmem"
+rm -rf "${COMPONENT_ROOT}/shmem"
 mkdir -p "${COMPONENT_ROOT}"
 
 if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
@@ -142,7 +143,7 @@ fi
 
 source "${PROJECT_ROOT}/scripts/check_gcc_version.sh"
 check_gcc_version || fail "UNSUPPORTED_GCC" "Host GCC is outside the supported build range." 5
-source "${PROJECT_ROOT}/hyper_parallel/core/multicore/shmem/_build/shmem_sdk.sh"
+source "${PROJECT_ROOT}/hyper_multicore/shmem/_build/shmem_sdk.sh"
 CURRENT_REASON_CODE="SHMEM_SDK_BUILD_FAILED"
 hp_prepare_shmem_sdk "${PROJECT_ROOT}" "${SOC_LIST}" "${NATIVE_JOBS}" "${CLEAN}"
 
@@ -153,7 +154,7 @@ SHMEM_SOURCE_DIR="${SHMEM_INSTALL_ROOT}/shmem"
 export SHMEM_HOME_PATH="${SHMEM_INSTALL_ROOT}"
 export SHMEM_SOURCE_DIR
 
-OPS_INSTALL_DIR="${COMPONENT_ROOT}/core/multicore/shmem"
+OPS_INSTALL_DIR="${COMPONENT_ROOT}/shmem"
 
 TORCH_CACHE_KEY=$("${PYTHON_BIN}" -c '
 import hashlib
@@ -169,19 +170,19 @@ identity = f"{torch_version}|{torch_origin}|{npu_version}|{npu_origin}"
 print(hashlib.sha256(identity.encode()).hexdigest()[:16])
 ')
 require_cache_key "Torch" "${TORCH_CACHE_KEY}"
-TORCH_INSTALL_DIR="${COMPONENT_ROOT}/core/multicore/shmem/lib/framework/torch"
+TORCH_INSTALL_DIR="${COMPONENT_ROOT}/shmem/lib/framework/torch"
 rm -rf "${TORCH_INSTALL_DIR}"
 
 # Build the SHMEM ops kernel library, then the HP SHMEM Runtime with its Torch bindings.
 CCSRC_OPS_BUILD_DIR="${SHMEM_WORK_ROOT}/ccsrc-ops"
 CURRENT_REASON_CODE="SHMEM_OPS_BUILD_FAILED"
-cmake -S "${PROJECT_ROOT}/hyper_parallel/core/multicore/shmem/ccsrc/ops" \
+cmake -S "${PROJECT_ROOT}/hyper_multicore/shmem/ccsrc/ops" \
     -B "${CCSRC_OPS_BUILD_DIR}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${OPS_INSTALL_DIR}"
 cmake --build "${CCSRC_OPS_BUILD_DIR}" --parallel "${NATIVE_JOBS}"
 cmake --install "${CCSRC_OPS_BUILD_DIR}"
-SHMEM_OPS_LIB="${OPS_INSTALL_DIR}/lib/libhyper_parallel_shmem_ops.so"
+SHMEM_OPS_LIB="${OPS_INSTALL_DIR}/lib/libhyper_multicore_shmem_ops.so"
 if [[ ! -s "${SHMEM_OPS_LIB}" ]]; then
     fail "EXPECTED_ARTIFACT_MISSING" \
         "SHMEM ops kernel library was not installed: ${SHMEM_OPS_LIB}." 9
@@ -189,7 +190,7 @@ fi
 
 CCSRC_TORCH_BUILD_DIR="${FRAMEWORK_WORK_ROOT}/ccsrc-torch-${TORCH_CACHE_KEY}"
 CURRENT_REASON_CODE="CCSRC_TORCH_BINDING_BUILD_FAILED"
-cmake -S "${PROJECT_ROOT}/hyper_parallel/core/multicore/shmem/ccsrc" \
+cmake -S "${PROJECT_ROOT}/hyper_multicore/shmem/ccsrc" \
     -B "${CCSRC_TORCH_BUILD_DIR}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${TORCH_INSTALL_DIR}" \
@@ -198,7 +199,7 @@ cmake -S "${PROJECT_ROOT}/hyper_parallel/core/multicore/shmem/ccsrc" \
 cmake --build "${CCSRC_TORCH_BUILD_DIR}" --parallel "${NATIVE_JOBS}"
 ctest --test-dir "${CCSRC_TORCH_BUILD_DIR}" --output-on-failure
 cmake --install "${CCSRC_TORCH_BUILD_DIR}"
-CCSRC_TORCH_MODULE="${TORCH_INSTALL_DIR}/hyper_parallel_shmem_torch.so"
+CCSRC_TORCH_MODULE="${TORCH_INSTALL_DIR}/hyper_multicore_shmem_torch.so"
 if [[ ! -s "${CCSRC_TORCH_MODULE}" ]]; then
     fail "EXPECTED_ARTIFACT_MISSING" \
         "SHMEM Torch binding module was not installed: ${CCSRC_TORCH_MODULE}." 9
@@ -206,8 +207,8 @@ fi
 
 CURRENT_REASON_CODE="SHMEM_ELF_VALIDATION_FAILED"
 for private_library in \
-    libhyper_parallel_shmem.so \
-    libhyper_parallel_shmem_utils.so \
+    libhyper_multicore_shmem.so \
+    libhyper_multicore_shmem_utils.so \
     aclshmem_bootstrap_uid.so \
     aclshmem_bootstrap_config_store.so; do
     private_library_path="${OPS_INSTALL_DIR}/lib/shmem/${private_library}"
@@ -220,7 +221,7 @@ for private_library in \
     fi
 done
 
-SHMEM_UTILS_LIB="${OPS_INSTALL_DIR}/lib/shmem/libhyper_parallel_shmem_utils.so"
+SHMEM_UTILS_LIB="${OPS_INSTALL_DIR}/lib/shmem/libhyper_multicore_shmem_utils.so"
 if ! readelf -Ws "${SHMEM_UTILS_LIB}" | grep -E '[[:space:]]hpshmem_log$' >/dev/null; then
     fail "SHMEM_PRIVATE_LOG_API_MISSING" \
         "Private SHMEM utility library does not export hpshmem_log: ${SHMEM_UTILS_LIB}." 11

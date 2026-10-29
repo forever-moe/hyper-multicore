@@ -32,19 +32,19 @@ at::Tensor moe_token_permute_grad_npu(const at::Tensor &grad, const at::Tensor &
   auto output = allocate_token_gradient(grad, sorted_indices, num_tokens, top_k);
   if (output.numel() != 0) {
     bool padded_mode = false;
-    static const hyper_parallel::multicore::CachedOpApi api(
+    static const hyper_multicore::CachedOpApi api(
         "aclnnMoeTokenPermuteGrad", "aclnnMoeTokenPermuteGradGetWorkspaceSize");
-    hyper_parallel::multicore::execute_cached_op(api, grad, sorted_indices, top_k, padded_mode, output);
+    hyper_multicore::execute_cached_op(api, grad, sorted_indices, top_k, padded_mode, output);
   }
   return output;
 }
 
 }  // namespace
 
-TORCH_LIBRARY_FRAGMENT(hyper_parallel, m) {
+TORCH_LIBRARY_FRAGMENT(hyper_multicore, m) {
   m.def("moe_token_permute_grad(Tensor grad, Tensor sorted_indices, int num_tokens, int top_k) -> Tensor");
 }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) { m.impl("moe_token_permute_grad", &moe_token_permute_grad_npu); }
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) { m.impl("moe_token_permute_grad", &moe_token_permute_grad_npu); }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) { m.impl("moe_token_permute_grad", &allocate_token_gradient); }
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) { m.impl("moe_token_permute_grad", &allocate_token_gradient); }

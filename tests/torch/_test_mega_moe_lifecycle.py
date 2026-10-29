@@ -23,13 +23,13 @@ import torch
 import torch.distributed as dist
 from torch.utils.checkpoint import checkpoint
 
-from hyper_parallel.core.multicore import MegaMoeExperts, shmem
-from hyper_parallel.core.multicore.modules.mega_moe import function as function_module
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore import MegaMoeExperts, shmem
+from hyper_multicore.modules.mega_moe import function as function_module
+from hyper_multicore.scheduler.config import (
     READY_CACHE_LINE_BYTES,
 )
-from tests.torch.multicore import _test_mega_moe as baseline
-from tests.torch.multicore._mega_moe_utils import (
+from tests.torch import _test_mega_moe as baseline
+from tests.common.multicore._mega_moe_utils import (
     assert_stable_memory,
     collect_memory,
     start_shmem_lifetime,

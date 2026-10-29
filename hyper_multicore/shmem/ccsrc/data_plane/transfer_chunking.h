@@ -21,7 +21,7 @@
 #define HP_SHMEM_CHUNKING_HOST_DEVICE inline
 #endif
 
-namespace hyper_parallel::multicore::shmem::data_plane {
+namespace hyper_multicore::shmem::data_plane {
 
 inline constexpr uint64_t kMinimumRebalancedChunkCount = 2;
 
@@ -122,6 +122,6 @@ HP_SHMEM_CHUNKING_HOST_DEVICE constexpr uint32_t divide_aligned_capacity(uint32_
   return unaligned_capacity - unaligned_capacity % alignment_bytes;
 }
 
-}  // namespace hyper_parallel::multicore::shmem::data_plane
+}  // namespace hyper_multicore::shmem::data_plane
 
 #undef HP_SHMEM_CHUNKING_HOST_DEVICE

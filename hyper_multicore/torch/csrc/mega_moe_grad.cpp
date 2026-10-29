@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  *
- * PyTorch TORCH_LIBRARY_IMPL for hyper_parallel::mega_moe_grad.
+ * PyTorch TORCH_LIBRARY_IMPL for hyper_multicore::mega_moe_grad.
  *
  * NPU implementation calls aclnnHyperMegaMoeGrad via the cached public
  * torch_npu extension bridge.
@@ -57,9 +57,9 @@ BwdReturn mega_moe_grad_npu(
     int64_t expert_num,
     int64_t hidden_size,
     int64_t seq_size) {
-    static const hyper_parallel::multicore::CachedOpApi api(
+    static const hyper_multicore::CachedOpApi api(
         "aclnnHyperMegaMoeGrad", "aclnnHyperMegaMoeGradGetWorkspaceSize");
-    hyper_parallel::multicore::execute_cached_op(api,
+    hyper_multicore::execute_cached_op(api,
         dispatch_target, dispatch_target_off, dy, dispatch_src_off, dispatch_size,
         hidden, hidden_dw, w2, act_grad_y, gate, grad_gate, w1, gate_dx, grad_x,
         combine_target_off, combine_src_off, combine_size,
@@ -118,11 +118,11 @@ BwdReturn mega_moe_grad_meta(
 }  // namespace
 
 // NPU (Ascend) device
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) {
     m.impl("mega_moe_grad", &mega_moe_grad_npu);
 }
 
 // Meta device
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) {
     m.impl("mega_moe_grad", &mega_moe_grad_meta);
 }

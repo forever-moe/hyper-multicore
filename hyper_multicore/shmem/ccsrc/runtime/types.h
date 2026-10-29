@@ -17,7 +17,7 @@
 #include <utility>
 #include <variant>
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 
 /** @brief Lifecycle states of the process-wide symmetric-memory Runtime. */
 enum class State : uint8_t {
@@ -111,4 +111,4 @@ struct StreamView {
   int32_t device_index;
 };
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

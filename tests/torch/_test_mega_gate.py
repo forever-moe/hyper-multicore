@@ -23,7 +23,7 @@ import tempfile
 import threading
 from unittest.mock import patch
 
-os.environ.setdefault("HYPER_PARALLEL_PLATFORM", "torch")
+os.environ.setdefault("HYPER_MULTICORE_PLATFORM", "torch")
 
 # pylint: disable=wrong-import-position
 import torch
@@ -31,10 +31,10 @@ from torch.nn import functional
 from torch.utils.checkpoint import checkpoint
 import torch_npu  # noqa: F401  pylint: disable=unused-import
 
-from hyper_parallel.core.multicore.modules.mega_gate import MegaGate
-from hyper_parallel.core.multicore.modules.mega_gate.diagnostics import MEGA_GATE_ROUTE_GRAD_STAGE_NAMES
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler
-from hyper_parallel.core.multicore.torch import mega_gate_ops
+from hyper_multicore.modules.mega_gate import MegaGate
+from hyper_multicore.modules.mega_gate.diagnostics import MEGA_GATE_ROUTE_GRAD_STAGE_NAMES
+from hyper_multicore.diagnostics import profiler as multicore_profiler
+from hyper_multicore.torch import mega_gate_ops
 # pylint: enable=wrong-import-position
 
 _DEVICE = torch.device("npu", int(os.environ.get("LOCAL_RANK", "0")))

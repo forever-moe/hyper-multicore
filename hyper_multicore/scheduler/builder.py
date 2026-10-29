@@ -20,14 +20,14 @@ ComputeGraph + TaskSplitValue into a binary RuntimeConfigC.  It omits
 graph-specific post-processing (add_terminate, revise_task_queue, etc.) — call
 build_config_for_rank() from a model's gen_runtime_data.py for full generation.
 """
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     RuntimeConfigC,
     TaskSplitValue,
     init_task_split_value,
     mega_moe_event_capacity,
 )
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.scheduler.graph import ComputeGraph
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
 
 
 def allocate_graph_config(graph: ComputeGraph, tsv: TaskSplitValue) -> RuntimeConfigC:

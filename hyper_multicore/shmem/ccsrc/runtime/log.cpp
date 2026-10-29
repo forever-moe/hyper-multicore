@@ -22,7 +22,7 @@
 
 #include "cann/log.h"
 
-namespace hyper_parallel::multicore::shmem::runtime::log {
+namespace hyper_multicore::shmem::runtime::log {
 namespace {
 
 constexpr std::size_t kLogLineCapacity = 2048U;
@@ -160,7 +160,7 @@ void finish_message(char (&message)[kLogLineCapacity], std::size_t length, bool 
 void WriteLine(const LineContext &context, const char *format, std::va_list arguments) noexcept {
   char output[kLogLineCapacity]{};
   FixedBufferWriter writer(output, sizeof(output));
-  writer.Append("[HP_SHMEM ");
+  writer.Append("[HYPER_MULTICORE_SHMEM ");
   writer.Append(context.file == nullptr ? "unknown" : context.file);
   if (context.line_number > 0) {
     writer.Append(":");
@@ -215,4 +215,4 @@ void Failure(const char *file, int line, const DfxFailure &failure) noexcept {
        message_length, message.data());
 }
 
-}  // namespace hyper_parallel::multicore::shmem::runtime::log
+}  // namespace hyper_multicore::shmem::runtime::log

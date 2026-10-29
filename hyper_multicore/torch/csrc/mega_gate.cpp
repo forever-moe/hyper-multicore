@@ -216,13 +216,13 @@ at::Tensor MegaGateRouteGradMeta(const at::Tensor &logits, const at::Tensor &rou
 
 }  // namespace
 
-TORCH_LIBRARY_IMPL(hyper_parallel, PrivateUse1, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) {
   m.impl("mega_gate_route_out", &MegaGateRouteOutNpu);
   m.impl("mega_gate_route", &MegaGateRouteNpu);
   m.impl("mega_gate_route_grad", &MegaGateRouteGradNpu);
 }
 
-TORCH_LIBRARY_IMPL(hyper_parallel, Meta, m) {
+TORCH_LIBRARY_IMPL(hyper_multicore, Meta, m) {
   m.impl("mega_gate_route_out", &MegaGateRouteOutNpu);
   m.impl("mega_gate_route", &MegaGateRouteMeta);
   m.impl("mega_gate_route_grad", &MegaGateRouteGradMeta);

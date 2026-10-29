@@ -20,8 +20,8 @@ import pytest
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore import shmem
-from tests.torch.multicore.shmem._worker_utils import acquire_runtime, release_runtime
+from hyper_multicore import shmem
+from tests.torch.shmem._worker_utils import acquire_runtime, release_runtime
 
 
 def test_binding_put_get() -> None:
@@ -74,7 +74,7 @@ def test_binding_config_projection() -> None:
     )
     assert config["timeout_seconds"] == 60, f"timeout_seconds must be 60, but got {config['timeout_seconds']}"
     assert config["data_engine"] == "mte", f"data_engine must be mte, but got {config['data_engine']}"
-    expected_endpoint = os.environ.get("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", "tcp://127.0.0.1:8662")
+    expected_endpoint = os.environ.get("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", "tcp://127.0.0.1:8662")
     assert config["bootstrap_endpoint_base"] == expected_endpoint, (
         f"bootstrap_endpoint_base must be {expected_endpoint}, but got {config['bootstrap_endpoint_base']}"
     )

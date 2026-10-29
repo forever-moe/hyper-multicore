@@ -21,7 +21,7 @@
 #include "runtime/dfx.h"
 #include "runtime/types.h"
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 
 /**
  * @brief Own the single process-local CANN SHMEM lifecycle and Allocation metadata.
@@ -143,4 +143,4 @@ class Runtime final {
   uint64_t next_allocation_id_{1};
 };
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

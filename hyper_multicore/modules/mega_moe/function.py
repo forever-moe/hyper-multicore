@@ -22,7 +22,7 @@ from typing import Any
 import torch
 import torch_npu
 
-from hyper_parallel.core.multicore.torch import ops as multicore_ops
+from hyper_multicore.torch import ops as multicore_ops
 
 from .plan import MegaMoePlan, record_plan_stream
 from .route import PreparedTopKRoute, RouteMetadata

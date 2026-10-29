@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     ATOMIC_ADD_VALUE_LEN,
     EVENT_INVALID_ID,
     FAST_DEPENDENCY_POLL_INTERVAL_US,
@@ -29,14 +29,14 @@ from hyper_parallel.core.multicore.scheduler.config import (
     TaskSplitValue,
     TaskType,
 )
-from hyper_parallel.core.multicore.scheduler.graph import (
+from hyper_multicore.scheduler.graph import (
     ComputeGraph,
     OperatorNode,
     OpType,
     SplitSpec,
     TensorSpec,
 )
-from hyper_parallel.core.multicore.tasks.task_base import FillConfig
+from hyper_multicore.tasks.task_base import FillConfig
 
 
 DEFAULT_GRAD_TOKEN_TILE = 32

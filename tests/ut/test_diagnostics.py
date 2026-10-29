@@ -40,25 +40,25 @@ from torch import (
 )
 from torch.testing import assert_close
 
-from hyper_parallel.core.multicore import prepare_mega_kernel_diagnostics
-from hyper_parallel.core.multicore.diagnostics.dump import api as tensor_dump
-from hyper_parallel.core.multicore import validate_mega_kernel_diagnostic_contract
-from hyper_parallel.core.multicore import diagnostics as diagnostics_module
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler
-from hyper_parallel.core.multicore.diagnostics.dump import l1 as tensor_dump_l1
-from hyper_parallel.core.multicore.modules.mega_moe.plan import build_mega_moe_plan
-from hyper_parallel.core.multicore.modules.mega_moe.spec import MegaMoeSpec
-from hyper_parallel.core.multicore.modules.mega_mhc.plan import build_mega_mhc_plan
-from hyper_parallel.core.multicore.modules.mega_mhc_grad.plan import build_mega_mhc_grad_plan
-from hyper_parallel.core.multicore.modules.mega_gate.diagnostics import bind_pipeline_graph
-from hyper_parallel.core.multicore.modules.mega_gate.plan import (
+from hyper_multicore import prepare_mega_kernel_diagnostics
+from hyper_multicore.diagnostics.dump import api as tensor_dump
+from hyper_multicore import validate_mega_kernel_diagnostic_contract
+from hyper_multicore import diagnostics as diagnostics_module
+from hyper_multicore.diagnostics import profiler as multicore_profiler
+from hyper_multicore.diagnostics.dump import l1 as tensor_dump_l1
+from hyper_multicore.modules.mega_moe.plan import build_mega_moe_plan
+from hyper_multicore.modules.mega_moe.spec import MegaMoeSpec
+from hyper_multicore.modules.mega_mhc.plan import build_mega_mhc_plan
+from hyper_multicore.modules.mega_mhc_grad.plan import build_mega_mhc_grad_plan
+from hyper_multicore.modules.mega_gate.diagnostics import bind_pipeline_graph
+from hyper_multicore.modules.mega_gate.plan import (
     _build_pipeline_runtime_config, MEGA_GATE_ROUTE_TASK_TYPES, MEGA_GATE_ROUTE_STAGE_NAMES,
     MEGA_GATE_ROUTE_GRAD_K1_TASK_TYPES, MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES,
 )
-from hyper_parallel.core.multicore.diagnostics.profiler.cycle_trace import _PreparedProfileRuntime
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC, TaskAiCoreType, TaskType
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec, TensorSpec
-from hyper_parallel.core.multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.diagnostics.profiler.cycle_trace import _PreparedProfileRuntime
+from hyper_multicore.scheduler.config import RuntimeConfigC, TaskAiCoreType, TaskType
+from hyper_multicore.scheduler.graph import ComputeGraph, OperatorNode, OpType, SplitSpec, TensorSpec
+from hyper_multicore.scheduler.runtime import allocate_runtime_config
 from tests.common.mark_utils import arg_mark
 
 
@@ -301,7 +301,7 @@ class TestMegaKernelDiagnostics(unittest.TestCase):
                     self.assertIs(call.diagnostic_buffer, events)
                 owner.assert_not_called()
             with mock.patch(
-                "hyper_parallel.core.multicore.diagnostics.profiler.api._PreparedProfileRuntime",
+                "hyper_multicore.diagnostics.profiler.api._PreparedProfileRuntime",
                 side_effect=AssertionError("dump must not prepare profiling"),
             ):
                 with tensor_dump.tensor_dump(tensor_dump.TensorDumpConfig(directory)):

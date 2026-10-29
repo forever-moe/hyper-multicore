@@ -28,7 +28,7 @@ C++ source functions:
 import copy
 import ctypes
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     SwiGluTilingDataC,
 )
 

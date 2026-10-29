@@ -18,9 +18,9 @@ from types import SimpleNamespace
 import unittest
 from unittest import mock
 
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments
-from hyper_parallel.core.multicore.diagnostics.common.session import (
+from hyper_multicore.diagnostics import MegaKernelDiagnostics
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments
+from hyper_multicore.diagnostics.common.session import (
     _activate_session, _deactivate_session, _reset_active_session_for_test,
 )
 from tests.common.mark_utils import arg_mark

@@ -22,8 +22,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC, TaskDescC, TaskType
-from hyper_parallel.core.multicore.scheduler.graph import ComputeGraph, OperatorNode
+from hyper_multicore.scheduler.config import RuntimeConfigC, TaskDescC, TaskType
+from hyper_multicore.scheduler.graph import ComputeGraph, OperatorNode
 
 
 @dataclass(frozen=True)

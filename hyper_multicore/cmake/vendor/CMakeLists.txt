@@ -14,7 +14,7 @@
 # ============================================================================
 
 cmake_minimum_required(VERSION 3.16)
-project(hyper_parallel_multicore_vendor LANGUAGES C CXX)
+project(hyper_multicore_multicore_vendor LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,12 +36,12 @@ endif()
 
 find_package(ASC REQUIRED)
 
-set(package_name hyper_parallel_multicore_nn)
+set(package_name hyper_multicore_nn)
 npu_op_package(${package_name}
     TYPE RUN
     CONFIG
         INSTALL_PATH ${HP_VENDOR_STAGE_ROOT}
-        VENDOR_NAME hyper_parallel_multicore_nn
+        VENDOR_NAME hyper_multicore_nn
         ENABLE_CPACK False
         ENABLE_SOURCE_PACKAGE False
         ENABLE_BINARY_PACKAGE True

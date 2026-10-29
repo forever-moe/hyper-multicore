@@ -2,16 +2,16 @@
  * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  *
  * PyTorch out-of-tree operator registration for MoE-FFN operators.
- * Registers into the 'hyper_parallel' namespace — does NOT modify aten:: or op-plugin.
+ * Registers into the 'hyper_multicore' namespace — does NOT modify aten:: or op-plugin.
  *
  * The packaged adapter is loaded lazily through torch.ops.load_library().
  * Static initializers register the operators, which are then called as:
- *   torch.ops.hyper_parallel.mega_moe(...)
- *   torch.ops.hyper_parallel.mega_moe_grad(...)
+ *   torch.ops.hyper_multicore.mega_moe(...)
+ *   torch.ops.hyper_multicore.mega_moe_grad(...)
  */
 #include <torch/library.h>
 
-TORCH_LIBRARY(hyper_parallel, m) {
+TORCH_LIBRARY(hyper_multicore, m) {
   m.def("moe_token_permute_out(Tensor tokens, Tensor indices, Tensor(a!) output, Tensor(b!) mapping) "
         "-> (Tensor(a!), Tensor(b!))");
   m.def(

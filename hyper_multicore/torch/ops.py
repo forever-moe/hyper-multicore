@@ -13,22 +13,22 @@
 # limitations under the License.
 # ============================================================================
 """
-hyper_parallel.core.multicore.torch.ops
+hyper_multicore.torch.ops
 =============================================
 Out-of-tree PyTorch operator registration for MoE-FFN operators.
 
-Registers into the ``hyper_parallel`` PyTorch namespace — does NOT modify
+Registers into the ``hyper_multicore`` PyTorch namespace — does NOT modify
 op-plugin or any PyTorch source. The operators are accessible via:
 
-    torch.ops.hyper_parallel.mega_moe(...)
-    torch.ops.hyper_parallel.mega_moe_grad(...)
+    torch.ops.hyper_multicore.mega_moe(...)
+    torch.ops.hyper_multicore.mega_moe_grad(...)
 
 Or via the Python wrappers in this module:
 
-    from hyper_parallel.core.multicore.torch.ops import mega_moe, mega_moe_grad
+    from hyper_multicore.torch.ops import mega_moe, mega_moe_grad
 
 Forward and backward ACLNN symbols are packaged in one component-owned
-``hyper_parallel_multicore_nn`` vendor. Source the packaged ``set_env.bash``
+``hyper_multicore_nn`` vendor. Source the packaged ``set_env.bash``
 before starting the application or framework Python process so CANN can discover that vendor.
 """
 from __future__ import annotations
@@ -49,12 +49,12 @@ from functools import lru_cache
 import torch
 import torch_npu  # noqa: F401  # pylint: disable=unused-import  # Registers native NPU operators.
 
-from hyper_parallel.core.multicore._loader import (
+from hyper_multicore._loader import (
     NativeComponentUnavailableError,
     get_multicore_paths,
     preload_vendor_library,
 )
-from hyper_parallel.core.multicore.diagnostics import MegaKernelDiagnostics
+from hyper_multicore.diagnostics import MegaKernelDiagnostics
 
 
 def _launch_diagnostic_out(
@@ -75,10 +75,10 @@ def _load_native() -> None:
     preload_vendor_library(vendor_root)
     try:
         torch.ops.load_library(str(adapter_path))
-        if torch.ops.hyper_parallel.mega_moe_transport_version() != 1:
+        if torch.ops.hyper_multicore.mega_moe_transport_version() != 1:
             raise RuntimeError("adapter transport ABI mismatch; rebuild the Torch adapter")
         # Torch exposes operator alias metadata through this private schema attribute.
-        schema = torch.ops.hyper_parallel.mega_moe_grad.default._schema  # pylint: disable=protected-access
+        schema = torch.ops.hyper_multicore.mega_moe_grad.default._schema  # pylint: disable=protected-access
         dispatch_alias = schema.arguments[0].alias_info.before_set
         input_grad_alias = schema.arguments[12].alias_info.before_set
         if not dispatch_alias or dispatch_alias != input_grad_alias:
@@ -137,7 +137,7 @@ def cann_mhc_pre_sinkhorn(
         dtype=torch.float32,
         device=x.device,
     )
-    torch.ops.hyper_parallel.cann_mhc_pre_sinkhorn(
+    torch.ops.hyper_multicore.cann_mhc_pre_sinkhorn(
         x_bsnd,
         phi,
         alpha,
@@ -199,7 +199,7 @@ def cann_mhc_pre_sinkhorn_with_cache(
     norm_out = torch.empty(
         (2 * num_iters, 1, token_count, hc_mult, hc_mult), dtype=torch.float32, device=x.device
     )
-    torch.ops.hyper_parallel.cann_mhc_pre_sinkhorn(
+    torch.ops.hyper_multicore.cann_mhc_pre_sinkhorn(
         x_bsnd,
         phi,
         alpha,
@@ -330,7 +330,7 @@ def hyper_mega_mhc(
     cache_outputs = _allocate_hyper_mega_mhc_forward_cache(residual, num_iters)
     if diagnostics is not None:
         diagnostic_outputs = _launch_diagnostic_out(
-            torch.ops.hyper_parallel.mega_mhc,
+            torch.ops.hyper_multicore.mega_mhc,
             (previous_output, residual, previous_pre_mix, previous_post_mix, previous_residual_mix,
              phi, alpha, bias, norm_weight),
             (new_residual, next_pre_mix, next_post_mix, next_residual_mix, block_input, *cache_outputs),
@@ -340,7 +340,7 @@ def hyper_mega_mhc(
         return (*diagnostic_outputs[:3],
                 diagnostic_outputs[3].reshape(batch_size, sequence_length, hc_mult, hc_mult),
                 *diagnostic_outputs[4:])
-    torch.ops.hyper_parallel.mega_mhc(
+    torch.ops.hyper_multicore.mega_mhc(
         previous_output, residual,
         previous_pre_mix, previous_post_mix,
         previous_residual_mix, phi,
@@ -461,13 +461,13 @@ def hyper_mega_mhc_grad(
     )
     if diagnostics is not None:
         return _launch_diagnostic_out(
-            torch.ops.hyper_parallel.mega_mhc_grad,
+            torch.ops.hyper_multicore.mega_mhc_grad,
             (grad_hin_placeholder, grad_h_post, grad_h_res, x, phi, alpha, bias, previous_pre,
              hc_before_norm, inv_rms, sum_out, norm_out, grad_current_pre, mixed_input, rms_rstd,
              norm_weight, direct_grad_x, previous_residual, previous_output, previous_post, previous_residual_mix),
             grad_outputs, runtime_config, all_event_counters, diagnostic_buffer, diagnostics, "backward", (hc_eps,),
         )
-    return torch.ops.hyper_parallel.mega_mhc_grad(
+    return torch.ops.hyper_multicore.mega_mhc_grad(
         grad_hin_placeholder, grad_h_post,
         grad_h_res, x,
         phi, alpha,
@@ -499,7 +499,7 @@ def moe_token_permute_out(
         mapping: Independent INT32 inverse mapping shaped ``[tokens * top_k]``.
     """
     _load_native()
-    torch.ops.hyper_parallel.moe_token_permute_out(tokens, indices, output, mapping)
+    torch.ops.hyper_multicore.moe_token_permute_out(tokens, indices, output, mapping)
 
 
 def mega_moe_unpermute_grad_out(
@@ -521,7 +521,7 @@ def mega_moe_unpermute_grad_out(
         grad_probs: Independent FP32 output matching the probabilities.
     """
     _load_native()
-    torch.ops.hyper_parallel.mega_moe_unpermute_grad_out(
+    torch.ops.hyper_multicore.mega_moe_unpermute_grad_out(
         permuted_tokens, grad_output, sorted_indices, probs, grad_permuted, grad_probs,
     )
 
@@ -592,7 +592,7 @@ def mega_moe(
         Topology / shape attributes.
     """
     _load_native()
-    torch.ops.hyper_parallel.mega_moe(
+    torch.ops.hyper_multicore.mega_moe(
         dispatch_target,
         dispatch_target_off,
         dispatch_src,
@@ -673,7 +673,7 @@ def mega_moe_grad(
             their registered schema order.
     """
     _load_native()
-    torch.ops.hyper_parallel.mega_moe_grad(
+    torch.ops.hyper_multicore.mega_moe_grad(
         dispatch_target,
         dispatch_target_off,
         dy,
@@ -782,7 +782,7 @@ def mega_moe_with_diagnostic_buffer(
         Topology / shape attributes.
     """
     _load_native()
-    torch.ops.hyper_parallel.mega_moe(
+    torch.ops.hyper_multicore.mega_moe(
         dispatch_target,
         dispatch_target_off,
         dispatch_src,
@@ -864,7 +864,7 @@ def mega_moe_grad_with_diagnostic_buffer(
             retain their registered schema order.
     """
     _load_native()
-    torch.ops.hyper_parallel.mega_moe_grad(
+    torch.ops.hyper_multicore.mega_moe_grad(
         dispatch_target,
         dispatch_target_off,
         dy,
@@ -921,6 +921,6 @@ def moe_token_permute_grad(
         Owned [T, H] gradients with the input gradient's dtype and device.
     """
     _load_native()
-    return torch.ops.hyper_parallel.moe_token_permute_grad(
+    return torch.ops.hyper_multicore.moe_token_permute_grad(
         grad_permuted_tokens, sorted_indices, num_tokens, top_k
     )

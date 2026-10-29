@@ -23,7 +23,7 @@ import torch
 import torch.distributed as dist
 import torch_npu
 
-from hyper_parallel.core.multicore.torch import ops as multicore_ops
+from hyper_multicore.torch import ops as multicore_ops
 
 from .spec import MegaMoeSpec, _align_capacity
 

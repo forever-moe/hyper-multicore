@@ -22,7 +22,7 @@ import torch
 import torch.distributed as dist
 import torch_npu  # noqa: F401  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore import shmem
+from hyper_multicore import shmem
 
 
 # The leading 0 guards the zero-byte contract: shmem.all_gather must validate and

@@ -18,14 +18,14 @@ import math
 import struct
 from dataclasses import dataclass
 
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     TaskDescC, TensorDescC, RuntimeConfigC,
     TaskAiCoreType, TaskType,
     MAX_TENSOR_DIMS,
 )
-from hyper_parallel.core.multicore.scheduler.graph import OpType
-from hyper_parallel.core.multicore.tasks.task_base import FillConfig
-from hyper_parallel.core.multicore.tasks.utils import advance_tsv_vector
+from hyper_multicore.scheduler.graph import OpType
+from hyper_multicore.tasks.task_base import FillConfig
+from hyper_multicore.tasks.utils import advance_tsv_vector
 
 
 def _encode_clamp_limit(clamp_limit: float | None) -> int:

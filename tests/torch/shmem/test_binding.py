@@ -19,8 +19,8 @@ from pathlib import Path
 
 from tests.common.mark_utils import arg_mark
 from tests.common.port_utils import allocate_port
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import prepare_multicore_test_environment
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import prepare_multicore_test_environment
 
 
 _TEST_DIR = os.path.dirname(__file__)
@@ -32,11 +32,18 @@ _ALL_GATHER_WORKER = os.path.join(_TEST_DIR, "_test_all_gather.py")
 
 def _run(worker: str, case_name: str, num_proc: int = 1) -> None:
     prepare_multicore_test_environment()
-    run_multicore_case(worker, case_name, num_proc=num_proc, timeout=None)
+    run_multicore_case(worker, case_name, num_proc=num_proc, timeout=1200)
 
 
 def _set_unique_bootstrap_endpoint(monkeypatch) -> None:
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+
+
+def _set_storage_log_environment(monkeypatch, path: Path) -> None:
+    """Capture the real native file sink separately for each storage test."""
+    monkeypatch.delenv("SHMEM_LOG_TO_STDOUT", raising=False)
+    monkeypatch.setenv("SHMEM_LOG_PATH", str(path))
+    monkeypatch.setenv("SHMEM_LOG_LEVEL", "DEBUG")
 
 
 @arg_mark(
@@ -117,9 +124,10 @@ def test_all_gather_output_size_mismatch_rejected(monkeypatch) -> None:
     card_mark="onecard",
     essential_mark="essential",
 )
-def test_binding_storage_invalidated_after_free(monkeypatch) -> None:
+def test_binding_storage_invalidated_after_free(monkeypatch, tmp_path: Path) -> None:
     """Zero the shared Storage after free so stale Tensors and views stop exposing the address."""
     _set_unique_bootstrap_endpoint(monkeypatch)
+    _set_storage_log_environment(monkeypatch, tmp_path)
     _run(_ALLOCATION_WORKER, "test_binding_storage_invalidated_after_free")
 
 
@@ -141,9 +149,10 @@ def test_binding_stale_tensor_cannot_corrupt_reused_allocation(monkeypatch) -> N
     card_mark="onecard",
     essential_mark="unessential",
 )
-def test_binding_orphan_storage_warning(monkeypatch) -> None:
+def test_binding_orphan_storage_warning(monkeypatch, tmp_path: Path) -> None:
     """Report but never implicitly free an active orphaned Allocation."""
     _set_unique_bootstrap_endpoint(monkeypatch)
+    _set_storage_log_environment(monkeypatch, tmp_path)
     _run(_ALLOCATION_WORKER, "test_binding_orphan_storage_warning")
 
 
@@ -230,8 +239,8 @@ def test_binding_config_projection(monkeypatch) -> None:
     _set_unique_bootstrap_endpoint(monkeypatch)
     # Pin non-default values so the worker's config assertions prove the Runtime echoes the
     # environment instead of its defaults.
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE", str(64 * 1024 * 1024))
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_TIMEOUT_SEC", "60")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE", str(64 * 1024 * 1024))
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_TIMEOUT_SEC", "60")
     _run(_ONE_SIDED_WORKER, "test_binding_config_projection", num_proc=2)
 
 
@@ -255,8 +264,8 @@ def test_binding_barrier_stream_ordering(monkeypatch) -> None:
 )
 def test_binding_init_timeout_injection(monkeypatch) -> None:
     """Inject an unreachable bootstrap endpoint and a 1s timeout; expect a prompt error."""
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_TIMEOUT_SEC", "1")
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", "tcp://192.0.2.1:8662")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_TIMEOUT_SEC", "1")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", "tcp://192.0.2.1:8662")
     monkeypatch.setenv("SHMEM_LOG_TO_STDOUT", "1")
     _run(_LIFECYCLE_WORKER, "test_binding_init_timeout_injection")
 
@@ -281,9 +290,9 @@ def test_binding_native_log_path_and_levels(monkeypatch, tmp_path: Path) -> None
     assert debug_files, "SHMEM_LOG_PATH produced no native DEBUG log"
     debug_contents = [path.read_text(encoding="utf-8") for path in debug_files]
     debug_lines = "\n".join(debug_contents).splitlines()
-    assert any(" debug " in line and "[HP_SHMEM " in line for line in debug_lines), debug_contents
-    assert any(" info " in line and "[HP_SHMEM " in line for line in debug_lines), debug_contents
-    assert any("[SHM_SHMEM " in content and "[HP_SHMEM " in content for content in debug_contents), debug_contents
+    assert any(" debug " in line and "[HYPER_MULTICORE_SHMEM " in line for line in debug_lines), debug_contents
+    assert any(" info " in line and "[HYPER_MULTICORE_SHMEM " in line for line in debug_lines), debug_contents
+    assert any("[SHM_SHMEM " in content and "[HYPER_MULTICORE_SHMEM " in content for content in debug_contents), debug_contents
 
     default_path = tmp_path / "default"
     default_path.mkdir()

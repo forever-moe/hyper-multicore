@@ -17,9 +17,9 @@
 from math import prod
 from typing import Any
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import bind_graph_tensor_ports
-from hyper_parallel.core.multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
-from hyper_parallel.core.multicore.scheduler.graph import TensorSpec
+from hyper_multicore.diagnostics.common.graph import bind_graph_tensor_ports
+from hyper_multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
+from hyper_multicore.scheduler.graph import TensorSpec
 
 
 def tensor_port(name: str, position: int, dtype_size: int = 4) -> TensorSpec:

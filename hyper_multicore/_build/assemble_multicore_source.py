@@ -31,10 +31,10 @@ from typing import Any
 from prepare_dependencies import verify_git_dependency
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 _LOCK_PATH = Path(__file__).with_name("dependencies.lock.json")
-_MULTICORE_OPS = _REPO_ROOT / "hyper_parallel" / "core" / "multicore" / "ops"
-_SHMEM_CCSRC = _REPO_ROOT / "hyper_parallel" / "core" / "multicore" / "shmem" / "ccsrc"
+_MULTICORE_OPS = _REPO_ROOT / "hyper_multicore" / "ops"
+_SHMEM_CCSRC = _REPO_ROOT / "hyper_multicore" / "shmem" / "ccsrc"
 _OPS_NN_PATHS = (
     "activation/swi_glu/op_kernel",
     "activation/swi_glu_grad/op_kernel",
@@ -121,7 +121,7 @@ def main() -> int:
     _apply_locked_adapters(transformer_mhc_copy, lock["ops_transformer_mhc"])
 
     source_root = work_dir / "source"
-    _compose_hyper_parallel_ops(
+    _compose_hyper_multicore_ops(
         source_root,
         ops_nn_copy,
         transformer_copy,
@@ -225,7 +225,7 @@ def _run_git_apply(
         raise ValueError(f"Adapter {phase} failed for {adapter_path}: {result.stdout.strip()}")
 
 
-def _compose_hyper_parallel_ops(
+def _compose_hyper_multicore_ops(
     source_root: Path,
     ops_nn_copy: Path,
     transformer_copy: Path,

@@ -26,13 +26,13 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore.diagnostics.common.session import (
+from hyper_multicore.diagnostics.common.session import (
     _activate_session,
     _deactivate_session,
 )
-from hyper_parallel.core.multicore.diagnostics.profiler.cycle_trace import _PreparedProfileRuntime
-from hyper_parallel.core.multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments, LaunchContext
-from hyper_parallel.core.multicore.diagnostics.common.schedule import DiagnosticAction
+from hyper_multicore.diagnostics.profiler.cycle_trace import _PreparedProfileRuntime
+from hyper_multicore.diagnostics.common.call import DiagnosticCall, LaunchArguments, LaunchContext
+from hyper_multicore.diagnostics.common.schedule import DiagnosticAction
 
 
 @dataclass

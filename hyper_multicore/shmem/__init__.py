@@ -52,7 +52,7 @@ __all__ = [
 def _register_native_module_path() -> None:
     """Register install directories of the native binding module on ``sys.path``.
 
-    ``_runtime`` imports the pybind11 module ``hyper_parallel_shmem_torch`` by
+    ``_runtime`` imports the pybind11 module ``hyper_multicore_shmem_torch`` by
     name through Python's standard module cache, while its shared library is
     installed outside the Python package tree. The candidate directories are
     registered here, before any boundary function triggers the lazy import;
@@ -60,12 +60,12 @@ def _register_native_module_path() -> None:
     """
     package_dir = _Path(__file__).resolve()
     candidates = [package_dir.parent / "lib" / "framework" / "torch"]
-    repository_root = package_dir.parents[4]
+    repository_root = package_dir.parents[2]
     if (repository_root / "setup.py").is_file():
         candidates.insert(
             0,
             repository_root
-            / "build/native/payload/hyper_parallel/core/multicore/shmem/lib/framework/torch",
+            / "build/native/payload/hyper_multicore/shmem/lib/framework/torch",
         )
     for candidate in candidates:
         if candidate.is_dir():

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(hyper_parallel_multicore_torch LANGUAGES CXX)
+project(hyper_multicore_multicore_torch LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,7 +10,7 @@ if(NOT HP_MULTICORE_VENDOR_ROOT OR
     NOT EXISTS "${HP_MULTICORE_VENDOR_ROOT}/op_api/include")
     message(FATAL_ERROR
         "HP_MULTICORE_VENDOR_ROOT must identify a complete "
-        "hyper_parallel_multicore_nn vendor")
+        "hyper_multicore_nn vendor")
 endif()
 
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
@@ -79,7 +79,7 @@ foreach(required_path IN ITEMS
     endif()
 endforeach()
 
-add_library(hyper_parallel_mega_moe_torch SHARED
+add_library(hyper_multicore_mega_moe_torch SHARED
     csrc/registration.cpp
     csrc/registration_mhc.cpp
     csrc/mega_mhc.cpp
@@ -88,9 +88,9 @@ add_library(hyper_parallel_mega_moe_torch SHARED
     csrc/moe_token_permute_grad.cpp
     csrc/moe_token_permute_out.cpp
     csrc/mega_moe_unpermute.cpp)
-target_compile_definitions(hyper_parallel_mega_moe_torch PRIVATE
+target_compile_definitions(hyper_multicore_mega_moe_torch PRIVATE
     _GLIBCXX_USE_CXX11_ABI=${TORCH_CXX11_ABI})
-target_include_directories(hyper_parallel_mega_moe_torch PRIVATE
+target_include_directories(hyper_multicore_mega_moe_torch PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Python3_INCLUDE_DIRS}
     ${TORCH_INCLUDE_ROOT}
@@ -100,16 +100,16 @@ target_include_directories(hyper_parallel_mega_moe_torch PRIVATE
     ${OP_PLUGIN_ROOT}
     ${OP_PLUGIN_ROOT}/op_plugin/include
     ${HP_MULTICORE_VENDOR_ROOT}/op_api/include)
-target_link_libraries(hyper_parallel_mega_moe_torch PRIVATE
+target_link_libraries(hyper_multicore_mega_moe_torch PRIVATE
     ${TORCH_LINK_LIBRARIES})
-hp_enable_elf_hardening(hyper_parallel_mega_moe_torch)
+hp_enable_elf_hardening(hyper_multicore_mega_moe_torch)
 
-add_library(hyper_parallel_mega_gate_torch SHARED
+add_library(hyper_multicore_mega_gate_torch SHARED
     csrc/mega_gate_registration.cpp
     csrc/mega_gate.cpp)
-target_compile_definitions(hyper_parallel_mega_gate_torch PRIVATE
+target_compile_definitions(hyper_multicore_mega_gate_torch PRIVATE
     _GLIBCXX_USE_CXX11_ABI=${TORCH_CXX11_ABI})
-target_include_directories(hyper_parallel_mega_gate_torch PRIVATE
+target_include_directories(hyper_multicore_mega_gate_torch PRIVATE
     ${Python3_INCLUDE_DIRS}
     ${TORCH_INCLUDE_ROOT}
     ${TORCH_INCLUDE_ROOT}/torch/csrc/api/include
@@ -118,8 +118,8 @@ target_include_directories(hyper_parallel_mega_gate_torch PRIVATE
     ${OP_PLUGIN_ROOT}
     ${OP_PLUGIN_ROOT}/op_plugin/include
     ${HP_MULTICORE_VENDOR_ROOT}/op_api/include)
-target_link_libraries(hyper_parallel_mega_gate_torch PRIVATE
+target_link_libraries(hyper_multicore_mega_gate_torch PRIVATE
     ${TORCH_LINK_LIBRARIES})
-hp_enable_elf_hardening(hyper_parallel_mega_gate_torch)
+hp_enable_elf_hardening(hyper_multicore_mega_gate_torch)
 
-install(TARGETS hyper_parallel_mega_moe_torch hyper_parallel_mega_gate_torch DESTINATION .)
+install(TARGETS hyper_multicore_mega_moe_torch hyper_multicore_mega_gate_torch DESTINATION .)

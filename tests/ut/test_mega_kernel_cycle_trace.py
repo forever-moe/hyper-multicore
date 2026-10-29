@@ -16,7 +16,7 @@
 
 import unittest
 
-from hyper_parallel.core.multicore.diagnostics.profiler.cycle_trace import (
+from hyper_multicore.diagnostics.profiler.cycle_trace import (
     CORE_HEADER,
     CUBE_SLOT_COUNT,
     INVALID_OWNER_ID,
@@ -26,7 +26,7 @@ from hyper_parallel.core.multicore.diagnostics.profiler.cycle_trace import (
     _parse_cycle_buffer,
     _profile_buffer_bytes_for_capacities,
 )
-from hyper_parallel.core.multicore.scheduler.config import TaskType
+from hyper_multicore.scheduler.config import TaskType
 
 
 _AIC_CAPACITY = 16

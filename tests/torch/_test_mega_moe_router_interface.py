@@ -21,9 +21,9 @@ from dataclasses import asdict
 
 import torch
 
-from hyper_parallel.core.multicore import MegaMoeExperts
-from tests.torch.multicore import _test_mega_moe as baseline
-from tests.torch.multicore._mega_moe_utils import (
+from hyper_multicore import MegaMoeExperts
+from tests.torch import _test_mega_moe as baseline
+from tests.common.multicore._mega_moe_utils import (
     start_shmem_lifetime,
     write_evidence,
 )
@@ -81,7 +81,7 @@ def test_mega_moe_router_interface() -> None:
     """Validate omitted counts and Router gradients with one step per backend."""
     shape = baseline.performance_shape()
     start_shmem_lifetime()
-    os.environ.pop("HYPER_PARALLEL_SHMEM_HEAP_SIZE", None)
+    os.environ.pop("HYPER_MULTICORE_SHMEM_HEAP_SIZE", None)
     mega, common = baseline.new_layers(shape)
     try:
         reference = _run_router_layer(common, shape)

@@ -18,7 +18,7 @@
 #include "cann/host.h"
 #include "runtime/log.h"
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 namespace {
 
 constexpr int32_t kUnavailableRootRank = -1;
@@ -408,4 +408,4 @@ Status Runtime::FailInitialization(DfxPhase phase, int32_t root_rank, const Stat
   return error;
 }
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

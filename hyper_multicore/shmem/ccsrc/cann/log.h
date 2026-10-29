@@ -16,7 +16,7 @@
 #include <mutex>
 #include <string_view>
 
-namespace hyper_parallel::multicore::shmem::cann::log {
+namespace hyper_multicore::shmem::cann::log {
 
 constexpr std::size_t kErrorDetailCapacity = 1024U;
 
@@ -71,4 +71,4 @@ int32_t configure() noexcept;
  */
 int32_t emit(int32_t level, const char *message) noexcept;
 
-}  // namespace hyper_parallel::multicore::shmem::cann::log
+}  // namespace hyper_multicore::shmem::cann::log

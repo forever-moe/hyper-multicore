@@ -14,7 +14,7 @@
 
 #include "cann/device.h"
 
-namespace hyper_parallel::multicore::shmem::data_plane::mte_rma {
+namespace hyper_multicore::shmem::data_plane::mte_rma {
 
 /**
  * @brief Issue an explicit MTE NBI Put using caller-owned UB and Event resources.
@@ -38,4 +38,4 @@ __aicore__ inline void put_nbi(__gm__ uint8_t *remote_dst, __gm__ const uint8_t 
 /** @brief Complete explicit MTE NBI operations previously issued by the calling AIV. */
 __aicore__ inline void quiet() { cann::device::mte_quiet(); }
 
-}  // namespace hyper_parallel::multicore::shmem::data_plane::mte_rma
+}  // namespace hyper_multicore::shmem::data_plane::mte_rma

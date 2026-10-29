@@ -21,8 +21,8 @@ from pathlib import Path
 
 from tests.common.mark_utils import arg_mark
 from tests.common.port_utils import allocate_port
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import (
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import (
     multicore_adapter_is_available,
     prepare_multicore_test_environment,
     without_inherited_rank_environment,
@@ -51,11 +51,11 @@ def test_swiglu_clamp_numerics() -> None:
     prepare_multicore_test_environment()
     if not multicore_adapter_is_available():
         raise RuntimeError(
-            "MegaMoe SwiGLU clamp ST requires a payload built with --multicore on"
+            "MegaMoe SwiGLU clamp ST requires a payload built with bash build.sh"
         )
     os.environ["HP_MEGA_MOE_WORLD_SIZE"] = "1"
-    os.environ["HYPER_PARALLEL_SHMEM_HEAP_SIZE"] = str(64 * 1024 * 1024)
-    os.environ["HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT"] = (
+    os.environ["HYPER_MULTICORE_SHMEM_HEAP_SIZE"] = str(64 * 1024 * 1024)
+    os.environ["HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT"] = (
         f"tcp://127.0.0.1:{allocate_port()}"
     )
     with without_inherited_rank_environment():

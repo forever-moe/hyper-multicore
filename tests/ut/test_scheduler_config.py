@@ -17,7 +17,7 @@
 import ctypes
 import unittest
 
-from hyper_parallel.core.multicore.scheduler import config as config_module
+from hyper_multicore.scheduler import config as config_module
 
 
 class TestSchedulerConfig(unittest.TestCase):

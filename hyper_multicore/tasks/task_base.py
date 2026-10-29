@@ -15,7 +15,7 @@
 """Abstract base class for all operator fill configs."""
 from abc import ABC, abstractmethod
 
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC
+from hyper_multicore.scheduler.config import RuntimeConfigC
 
 
 class FillConfig(ABC):

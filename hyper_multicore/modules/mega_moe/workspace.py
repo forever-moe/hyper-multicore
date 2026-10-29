@@ -26,13 +26,13 @@ from typing import Any
 
 import torch
 
-from hyper_parallel.core.multicore import _collective, shmem
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore import _collective, shmem
+from hyper_multicore.scheduler.config import (
     MIN_EVENT_CAPACITY,
     event_workspace_bytes,
     mega_moe_event_capacity,
 )
-from hyper_parallel.core.multicore.shmem import _lifecycle
+from hyper_multicore.shmem import _lifecycle
 
 from .spec import MegaMoeSpec, _resolve_receive_capacity
 

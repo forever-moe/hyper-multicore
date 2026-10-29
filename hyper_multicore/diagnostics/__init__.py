@@ -14,11 +14,11 @@
 # ============================================================================
 """Common MegaKernel integration API; concrete tools live in sibling packages."""
 
-from hyper_parallel.core.multicore.diagnostics.api import (
+from hyper_multicore.diagnostics.api import (
     MegaKernelDiagnostics, prepare_mega_kernel_diagnostics,
 )
-from hyper_parallel.core.multicore.diagnostics.common.graph import validate_mega_kernel_diagnostic_contract
-from hyper_parallel.core.multicore.diagnostics.common.schedule import DiagnosticAction, schedule
+from hyper_multicore.diagnostics.common.graph import validate_mega_kernel_diagnostic_contract
+from hyper_multicore.diagnostics.common.schedule import DiagnosticAction, schedule
 
 __all__ = [
     "DiagnosticAction", "MegaKernelDiagnostics", "prepare_mega_kernel_diagnostics",

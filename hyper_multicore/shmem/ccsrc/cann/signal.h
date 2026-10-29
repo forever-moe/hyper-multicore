@@ -12,7 +12,7 @@
 
 #include <cstdint>
 
-namespace hyper_parallel::multicore::shmem::cann {
+namespace hyper_multicore::shmem::cann {
 
 /** @brief Update operation applied to one remote Signal word. */
 enum class SignalOp : uint8_t {
@@ -30,4 +30,4 @@ enum class CompareOp : uint8_t {
   LessEqual,
 };
 
-}  // namespace hyper_parallel::multicore::shmem::cann
+}  // namespace hyper_multicore::shmem::cann

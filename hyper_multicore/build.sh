@@ -11,14 +11,14 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../../.." && pwd)
+PROJECT_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
 source "${PROJECT_ROOT}/scripts/native/cann_version.sh"
 HP_MINIMUM_CANN_VERSION="9.1.0"
 BUILD_DIR="${PROJECT_ROOT}/build"
 NATIVE_ROOT="${BUILD_DIR}/native"
 WORK_ROOT="${NATIVE_ROOT}/work/multicore"
-COMPONENT_ROOT="${NATIVE_ROOT}/components/multicore/hyper_parallel"
-OUTPUT_ROOT="${COMPONENT_ROOT}/core/multicore/lib"
+COMPONENT_ROOT="${NATIVE_ROOT}/components/multicore/hyper_multicore"
+OUTPUT_ROOT="${COMPONENT_ROOT}/lib"
 SOC_LIST="ascend910b,ascend910_93"
 NATIVE_JOBS="$(nproc)"
 CLEAN="off"
@@ -29,7 +29,7 @@ PYTHON_BIN=python
 function show_help() {
     cat <<EOF
 Usage:
-  bash hyper_parallel/core/multicore/build.sh [OPTIONS]
+  bash hyper_multicore/build.sh [OPTIONS]
 
 Options:
   --soc-list VALUE    Comma-separated CANN SoC IDs. Default: ascend910b,ascend910_93.
@@ -151,6 +151,7 @@ if [[ ${#CANN_SOCS[@]} -eq 0 ]]; then
     fail "UNSUPPORTED_SOC_SELECTION" "--soc-list must select at least one SoC." 10
 fi
 CANN_SOC_LIST=$(IFS=,; echo "${CANN_SOCS[*]}")
+[[ "$(uname -s)" == Linux ]] || fail "UNSUPPORTED_HOST" "Native builds require Linux/CANN/PTA." 3
 
 function validate_multicore_build_log() {
     local build_log=$1
@@ -342,6 +343,11 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
         "The selected Python executable is unavailable: ${PYTHON_BIN}." 4
 fi
 PYTHON_BIN=$(command -v "${PYTHON_BIN}")
+IDENTITY_FILE="${WORK_ROOT}/identity.json"
+BUILD_FINGERPRINT=$(TORCH_DEVICE_BACKEND_AUTOLOAD=0 "${PYTHON_BIN}" \
+    "${PROJECT_ROOT}/hyper_multicore/_build/artifacts.py" --prepare \
+    --soc-list "${CANN_SOC_LIST}" --output "${IDENTITY_FILE}")
+WORK_ROOT="${WORK_ROOT}/build-${BUILD_FINGERPRINT}"
 required_tools=(awk asc_opc bash cmake find gcc g++ git grep ld ldd make nm readelf readlink)
 required_tools+=(sed sha256sum sort tee)
 for required_tool in "${required_tools[@]}"; do
@@ -367,23 +373,25 @@ check_gcc_version || fail "UNSUPPORTED_GCC" "Host GCC is outside the supported b
 OPS_NN_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_nn/src"
 OPS_TRANSFORMER_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_transformer/src"
 OPS_TRANSFORMER_MHC_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_transformer_mhc/src"
-MULTICORE_VENDOR_CMAKE="${PROJECT_ROOT}/hyper_parallel/core/multicore/cmake/vendor"
+MULTICORE_VENDOR_CMAKE="${PROJECT_ROOT}/hyper_multicore/cmake/vendor"
 
 CURRENT_REASON_CODE="MULTICORE_DEPENDENCY_PREPARATION_FAILED"
-"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_parallel/core/multicore/_build/prepare_dependencies.py" \
+"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/prepare_dependencies.py" \
     --dependency ops_nn \
     --dependency ops_transformer_mhc \
     --dependency ops_transformer
 
 CURRENT_REASON_CODE="SHMEM_SDK_HANDOFF_FAILED"
+# SHMEM publishes this before the vendor work root is fingerprinted.
+SHMEM_SDK_MANIFEST="${NATIVE_ROOT}/work/multicore/shmem/sdk.json"
 SHMEM_INSTALL_ROOT=$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["install_root"])' \
-    "${WORK_ROOT}/shmem/sdk.json")
+    "${SHMEM_SDK_MANIFEST}")
 HP_SHMEM_TOOLCHAIN_KEY=$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["toolchain_key"])' \
-    "${WORK_ROOT}/shmem/sdk.json")
+    "${SHMEM_SDK_MANIFEST}")
 if [[ ! -f "${SHMEM_INSTALL_ROOT}/shmem/include/shmem.h" \
       || ! -d "${SHMEM_INSTALL_ROOT}/shmem/src" \
-      || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/libhyper_parallel_shmem.so" \
-      || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/libhyper_parallel_shmem_utils.so" \
+      || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/libhyper_multicore_shmem.so" \
+      || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/libhyper_multicore_shmem_utils.so" \
       || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/aclshmem_bootstrap_uid.so" \
       || ! -f "${SHMEM_INSTALL_ROOT}/shmem/lib/aclshmem_bootstrap_config_store.so" ]]; then
     fail "SHMEM_SDK_NOT_PREPARED" \
@@ -399,7 +407,7 @@ with open(sys.argv[1], encoding="utf-8") as source:
     lock = json.load(source)["components"]["multicore"]
 encoded = json.dumps(lock, sort_keys=True, separators=(",", ":")).encode()
 print(hashlib.sha256(encoded).hexdigest())
-' "${PROJECT_ROOT}/hyper_parallel/core/multicore/_build/dependencies.lock.json"); then
+' "${PROJECT_ROOT}/hyper_multicore/_build/dependencies.lock.json"); then
     fail "MULTICORE_LOCK_INVALID" "Cannot read the locked multicore dependency contract." 9
 fi
 if [[ ! "${MULTICORE_LOCK_DIGEST}" =~ ^[0-9a-f]{64}$ ]]; then
@@ -466,16 +474,16 @@ function calculate_vendor_fingerprint() {
             sha256sum "${CANN_VERSION_FILE}"
             sha256sum "${asc_opc_path}"
             sha256sum \
-                hyper_parallel/core/multicore/build.sh \
-                hyper_parallel/core/multicore/_build/assemble_multicore_source.py \
-                hyper_parallel/core/multicore/_build/merge_multicore_vendors.py \
-                hyper_parallel/core/multicore/cmake/hardening.cmake \
-                hyper_parallel/core/multicore/shmem/_build/shmem_sdk.sh
+                hyper_multicore/build.sh \
+                hyper_multicore/_build/assemble_multicore_source.py \
+                hyper_multicore/_build/merge_multicore_vendors.py \
+                hyper_multicore/cmake/hardening.cmake \
+                hyper_multicore/shmem/_build/shmem_sdk.sh
             while IFS= read -r -d '' source_file; do
                 sha256sum "${source_file}"
             done < <(
-                find hyper_parallel/core/multicore/ops hyper_parallel/core/multicore/cmake/vendor \
-                    hyper_parallel/core/multicore/shmem/cmake/shmem_wrapper \
+                find hyper_multicore/ops hyper_multicore/cmake/vendor \
+                    hyper_multicore/shmem/cmake/shmem_wrapper \
                     -type f -print0 | sort -z
             )
         } | sha256sum | awk '{print $1}'
@@ -490,10 +498,10 @@ for cann_soc in "${CANN_SOCS[@]}"; do
     SOURCE_ROOT="${ASSEMBLY_ROOT}/source"
     VENDOR_BUILD_ROOT="${WORK_ROOT}/vendor-build/${cann_soc}"
     VENDOR_STAGE_ROOT="${VENDOR_BUILD_ROOT}/stage"
-    VENDOR_CANDIDATE="${VENDOR_STAGE_ROOT}/packages/vendors/hyper_parallel_multicore_nn"
+    VENDOR_CANDIDATE="${VENDOR_STAGE_ROOT}/packages/vendors/hyper_multicore_nn"
     KERNEL_LOG="${WORK_ROOT}/logs/cann-vendor-build-${cann_soc}.log"
     CACHE_ROOT="${WORK_ROOT}/vendor-cache/${cann_soc}"
-    SNAPSHOT_VENDOR="${CACHE_ROOT}/hyper_parallel_multicore_nn"
+    SNAPSHOT_VENDOR="${CACHE_ROOT}/hyper_multicore_nn"
     FINGERPRINT_FILE="${CACHE_ROOT}/fingerprint.sha256"
     HOST_INPUT_IDENTITY_FILE="${CACHE_ROOT}/common-host-input-identity.sha256"
     VENDOR_FINGERPRINT=$(calculate_vendor_fingerprint "${cann_soc}")
@@ -512,7 +520,7 @@ for cann_soc in "${CANN_SOCS[@]}"; do
 
     rm -rf "${ASSEMBLY_ROOT}" "${VENDOR_BUILD_ROOT}"
     CURRENT_REASON_CODE="MULTICORE_SOURCE_ASSEMBLY_FAILED"
-    "${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_parallel/core/multicore/_build/assemble_multicore_source.py" \
+    "${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/assemble_multicore_source.py" \
         --ops-nn-source "${OPS_NN_SOURCE_DIR}" \
         --ops-transformer-source "${OPS_TRANSFORMER_SOURCE_DIR}" \
         --ops-transformer-mhc-source "${OPS_TRANSFORMER_MHC_SOURCE_DIR}" \
@@ -547,7 +555,7 @@ for cann_soc in "${CANN_SOCS[@]}"; do
 
     if [[ ! -d "${VENDOR_CANDIDATE}" ]]; then
         fail "UNIFIED_VENDOR_NOT_FOUND" \
-            "Expected ${cann_soc} hyper_parallel_multicore_nn package at ${VENDOR_CANDIDATE}." 12
+            "Expected ${cann_soc} hyper_multicore_nn package at ${VENDOR_CANDIDATE}." 12
     fi
     CURRENT_REASON_CODE="CANN_VENDOR_VALIDATION_FAILED"
     validate_multicore_vendor "${VENDOR_CANDIDATE}" "${cann_soc}" "${KERNEL_LOG}"
@@ -560,23 +568,23 @@ for cann_soc in "${CANN_SOCS[@]}"; do
     PER_SOC_HOST_INPUT_IDENTITIES+=("--host-input-identity" "${cann_soc}=${COMMON_HOST_INPUT_IDENTITY}")
 done
 
-VENDOR_ROOT="${OUTPUT_ROOT}/vendors/hyper_parallel_multicore_nn"
+VENDOR_ROOT="${OUTPUT_ROOT}/vendors/hyper_multicore_nn"
 mkdir -p "$(dirname "${VENDOR_ROOT}")"
 CURRENT_REASON_CODE="CANN_VENDOR_MERGE_FAILED"
-"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_parallel/core/multicore/_build/merge_multicore_vendors.py" \
+"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/merge_multicore_vendors.py" \
     "${PER_SOC_VENDOR_INPUTS[@]}" \
     "${PER_SOC_HOST_INPUT_IDENTITIES[@]}" \
     --output "${VENDOR_ROOT}"
 
 CURRENT_REASON_CODE="CANN_VENDOR_VALIDATION_FAILED"
 validate_multicore_vendor "${VENDOR_ROOT}" "${CANN_SOC_LIST}"
-cp "${PROJECT_ROOT}/hyper_parallel/core/multicore/set_env.bash" "${OUTPUT_ROOT}/set_env.bash"
+cp "${PROJECT_ROOT}/hyper_multicore/set_env.bash" "${OUTPUT_ROOT}/set_env.bash"
 
 export HP_MULTICORE_VENDOR_ROOT="${VENDOR_ROOT}"
 export CANN_VENDOR_LIBDIR="${VENDOR_ROOT}/op_api/lib"
 BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 CURRENT_REASON_CODE="TORCH_ADAPTER_BUILD_FAILED"
-TORCH_SOURCE="${PROJECT_ROOT}/hyper_parallel/core/multicore/torch"
+TORCH_SOURCE="${PROJECT_ROOT}/hyper_multicore/torch"
 TORCH_CACHE_KEY=$("${PYTHON_BIN}" -c '
 import hashlib
 from importlib.metadata import version
@@ -603,14 +611,14 @@ cmake -S "${TORCH_SOURCE}" \
     -DPython3_EXECUTABLE="${PYTHON_BIN}"
 cmake --build "${TORCH_BUILD}" --parallel "${NATIVE_JOBS}"
 cmake --install "${TORCH_BUILD}"
-if [[ ! -s "${TORCH_OUTPUT}/libhyper_parallel_mega_moe_torch.so" ]]; then
+if [[ ! -s "${TORCH_OUTPUT}/libhyper_multicore_mega_moe_torch.so" ]]; then
     fail "TORCH_ADAPTER_ARTIFACT_MISSING" \
         "PyTorch multicore adapter was not installed under ${TORCH_OUTPUT}." 13
 fi
 
-if [[ ! -s "${TORCH_OUTPUT}/libhyper_parallel_mega_gate_torch.so" ]]; then
+if [[ ! -s "${TORCH_OUTPUT}/libhyper_multicore_mega_gate_torch.so" ]]; then
     fail "TORCH_ADAPTER_ARTIFACT_MISSING" \
-        "Missing MegaGate Torch adapter: ${TORCH_OUTPUT}/libhyper_parallel_mega_gate_torch.so" 12
+        "Missing MegaGate Torch adapter: ${TORCH_OUTPUT}/libhyper_multicore_mega_gate_torch.so" 12
 fi
 
 CURRENT_REASON_CODE="HOST_ELF_VALIDATION_FAILED"
@@ -656,9 +664,11 @@ done < <(find "${OUTPUT_ROOT}/framework" -type f -name '*.so' -print)
 
 while IFS= read -r packaged_library; do
     validate_shared_library_security "${packaged_library}"
-done < <(find "${COMPONENT_ROOT}/core/multicore" -type f -name '*.so' -print)
+done < <(find "${COMPONENT_ROOT}" -type f -name '*.so' -print)
 
 trap - ERR
+"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/artifacts.py" \
+    --output "${COMPONENT_ROOT}" --finalize "${IDENTITY_FILE}"
 echo "INFO: multicore build completed"
 echo "  framework: torch"
 echo "  vendor: ${VENDOR_ROOT}"
@@ -666,8 +676,8 @@ echo "  framework payload: ${OUTPUT_ROOT}/framework"
 echo "  component: ${COMPONENT_ROOT}"
 
 if [[ "${STAGE_ONLY}" == "off" ]]; then
-    PAYLOAD_COMPONENT="${NATIVE_ROOT}/payload/hyper_parallel/core/multicore"
+    PAYLOAD_COMPONENT="${NATIVE_ROOT}/payload/hyper_multicore"
     rm -rf "${PAYLOAD_COMPONENT}"
     mkdir -p "${PAYLOAD_COMPONENT}"
-    cp -a "${COMPONENT_ROOT}/core/multicore/." "${PAYLOAD_COMPONENT}/"
+    cp -a "${COMPONENT_ROOT}/." "${PAYLOAD_COMPONENT}/"
 fi

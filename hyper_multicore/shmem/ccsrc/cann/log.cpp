@@ -19,7 +19,7 @@
 #include "host/utils/hpshmem_log.h"
 #include "shmem.h"
 
-namespace hyper_parallel::multicore::shmem::cann::log {
+namespace hyper_multicore::shmem::cann::log {
 namespace {
 
 constexpr int32_t kErrorLogLevel = 3;
@@ -139,4 +139,4 @@ int32_t emit(int32_t level, const char *message) noexcept {
   return status == ACLSHMEM_SUCCESS ? hpshmem_log(level, message) : status;
 }
 
-}  // namespace hyper_parallel::multicore::shmem::cann::log
+}  // namespace hyper_multicore::shmem::cann::log

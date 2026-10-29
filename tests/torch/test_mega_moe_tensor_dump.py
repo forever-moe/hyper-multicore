@@ -20,8 +20,8 @@ from pathlib import Path
 
 from tests.common.mark_utils import arg_mark
 from tests.common.port_utils import allocate_port
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import (
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import (
     multicore_adapter_is_available,
     prepare_multicore_test_environment,
     without_inherited_rank_environment,
@@ -36,16 +36,16 @@ def _prepare_torch_multicore_test_environment() -> None:
     """Activate multicore and require a payload built for Torch."""
     prepare_multicore_test_environment()
     if not multicore_adapter_is_available():
-        raise RuntimeError("MegaMoe Torch ST requires a wheel or PYTHONPATH payload built with --multicore on")
+        raise RuntimeError("MegaMoe Torch ST requires a wheel or PYTHONPATH payload built with bash build.sh")
 
 
 def _run_dump_case(monkeypatch, output_dir: Path, case_name: str) -> None:
     """Run one two-rank dump worker with an isolated output directory."""
     _prepare_torch_multicore_test_environment()
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE", str(64 * 1024 * 1024))
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE", str(64 * 1024 * 1024))
     monkeypatch.setenv("HP_MEGA_MOE_WORLD_SIZE", str(_WORLD_SIZE))
     monkeypatch.setenv("HP_MEGA_MOE_DUMP_RESULT_DIR", str(output_dir))
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
     with without_inherited_rank_environment():
         run_multicore_case(_WORKER, case_name, num_proc=_WORLD_SIZE)
 

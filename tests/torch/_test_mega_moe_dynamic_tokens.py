@@ -26,9 +26,9 @@ import torch_npu  # pylint: disable=unused-import
 from torch.nn import functional
 from torch.utils.checkpoint import checkpoint
 
-from hyper_parallel.core.multicore import MegaMoeExperts
-from tests.torch.multicore._evidence_helpers import EXTENDED_LEVEL1
-from tests.torch.multicore._mega_moe_utils import start_shmem_lifetime, write_evidence
+from hyper_multicore import MegaMoeExperts
+from tests.common.multicore._evidence_helpers import EXTENDED_LEVEL1
+from tests.common.multicore._mega_moe_utils import start_shmem_lifetime, write_evidence
 
 _HIDDEN = 512
 _INTERMEDIATE = 128

@@ -17,11 +17,15 @@
 from __future__ import annotations
 
 import ctypes
+import hashlib
+from importlib import metadata, util
+import json
 import os
 from pathlib import Path
+import platform
 import sys
 
-_VENDOR_NAME = "hyper_parallel_multicore_nn"
+_VENDOR_NAME = "hyper_multicore_nn"
 
 
 class NativeComponentUnavailableError(RuntimeError):
@@ -36,7 +40,7 @@ def require_multicore_environment() -> Path:
         raise NativeComponentUnavailableError(
             f"[HP-NATIVE-PAYLOAD-MISSING] component=multicore vendor={vendor_root}. "
             "Inspect the current build log; for source/PYTHONPATH development, run "
-            "./build.sh --multicore on."
+            "./build.sh."
         )
     vendor_root = vendor_root.resolve()
     op_api_root = (vendor_root / "op_api" / "lib").resolve()
@@ -79,14 +83,49 @@ def get_multicore_adapter_path(adapter_name: str) -> tuple[Path, Path]:
         raise NativeComponentUnavailableError(
             "[HP-NATIVE-FRAMEWORK-TARGET-UNAVAILABLE] component=multicore framework=torch "
             f"root={_component_root()}. The current wheel/PYTHONPATH payload does not include an adapter for this "
-            "framework; rebuild with --multicore on and inspect the build log."
+            "framework; rebuild with bash build.sh and inspect the build log."
         )
+    validate_native_compatibility()
     return vendor_root, adapter.resolve()
+
+
+def validate_native_compatibility() -> None:
+    """Reject a native build made for a different Torch/PTA, Python or C++ ABI.
+
+    Reads the selected payload's generated identity without modifying the environment.
+    Called before adapter or SHMEM binding loading, not at plain package import.
+
+    Raises:
+        NativeComponentUnavailableError: If identity is missing or incompatible.
+    """
+    info_path = _component_root().parent / "build_info.json"
+    try:
+        info = json.loads(info_path.read_text(encoding="utf-8"))
+        actual = {"torch_version": metadata.version("torch"), "pta_version": metadata.version("torch-npu"),
+                  "python_abi": f"cp{sys.version_info.major}{sys.version_info.minor}",
+                  "host_arch": platform.machine()}
+        import torch  # Native boundary only; interrogate the framework selected for this process.
+
+        actual["torch_cxx11_abi"] = bool(torch._C._GLIBCXX_USE_CXX11_ABI)
+        actual["torch_commit"] = getattr(torch.version, "git_version", None)
+        spec = util.find_spec("torch_npu")
+        if spec is None or spec.origin is None:
+            raise RuntimeError("torch_npu package is unavailable")
+        library = Path(spec.origin).resolve().parent / "lib/libtorch_npu.so"
+        actual["libtorch_npu_sha256"] = hashlib.sha256(library.read_bytes()).hexdigest()
+        version_file = Path(os.environ["ASCEND_HOME_PATH"]) / "opp/version.info"
+        actual["cann_version_sha256"] = hashlib.sha256(version_file.read_bytes()).hexdigest()
+        mismatches = {key: {"built": info.get(key), "actual": value}
+                      for key, value in actual.items() if key not in info or info[key] != value}
+        if mismatches:
+            raise RuntimeError(f"Native environment identity mismatch: {mismatches}")
+    except (OSError, ValueError, KeyError, RuntimeError, metadata.PackageNotFoundError) as error:
+        raise NativeComponentUnavailableError(f"[HYPER-MULTICORE-ABI-MISMATCH] {info_path}: {error}") from error
 
 
 def get_multicore_paths() -> tuple[Path, Path]:
     """Return the unified vendor root and legacy MegaMoe Torch adapter."""
-    return get_multicore_adapter_path("hyper_parallel_mega_moe_torch")
+    return get_multicore_adapter_path("hyper_multicore_mega_moe_torch")
 
 
 def preload_vendor_library(vendor_root: Path) -> None:
@@ -108,11 +147,10 @@ def _component_root() -> Path:
     packaged = Path(__file__).resolve().parent / "lib"
     if packaged.is_dir():
         return packaged
-    repository_root = Path(__file__).resolve().parents[3]
+    repository_root = Path(__file__).resolve().parents[1]
     if (repository_root / "setup.py").is_file():
         source_build = (
-            repository_root / "build" / "native" / "payload" / "hyper_parallel"
-            / "core" / "multicore" / "lib"
+            repository_root / "build" / "native" / "payload" / "hyper_multicore" / "lib"
         )
         if source_build.is_dir():
             return source_build

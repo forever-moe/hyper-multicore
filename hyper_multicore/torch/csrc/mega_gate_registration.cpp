@@ -6,7 +6,7 @@
 
 #include <torch/library.h>
 
-TORCH_LIBRARY_FRAGMENT(hyper_parallel, m) {
+TORCH_LIBRARY_FRAGMENT(hyper_multicore, m) {
   m.def(
     "mega_gate_route_out(Tensor logits, Tensor text_bias, Tensor vision_bias, Tensor image_mask, "
     "Tensor runtime_config, Tensor diagnostic_buffer, Tensor(a!) routing_weights, Tensor(b!) expert_indices, "

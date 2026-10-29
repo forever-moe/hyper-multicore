@@ -23,13 +23,13 @@ from unittest.mock import Mock, patch
 
 import torch
 
-from hyper_parallel.core.multicore.modules.mega_moe import route as route_module
-from hyper_parallel.core.multicore.modules.mega_moe.route import (
+from hyper_multicore.modules.mega_moe import route as route_module
+from hyper_multicore.modules.mega_moe.route import (
     _expert_capacity,
     _resolve_counts,
     prepare_topk_route,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.spec import MegaMoeSpec
+from hyper_multicore.modules.mega_moe.spec import MegaMoeSpec
 
 
 class TestMegaMoeRoute(unittest.TestCase):

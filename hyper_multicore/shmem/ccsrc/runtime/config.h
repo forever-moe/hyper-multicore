@@ -17,12 +17,12 @@
 
 #include "runtime/types.h"
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 
-inline constexpr std::string_view kHeapSizeEnv = "HYPER_PARALLEL_SHMEM_HEAP_SIZE";
-inline constexpr std::string_view kTimeoutEnv = "HYPER_PARALLEL_SHMEM_TIMEOUT_SEC";
-inline constexpr std::string_view kDataEngineEnv = "HYPER_PARALLEL_SHMEM_DATA_ENGINE";
-inline constexpr std::string_view kBootstrapEndpointEnv = "HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT";
+inline constexpr std::string_view kHeapSizeEnv = "HYPER_MULTICORE_SHMEM_HEAP_SIZE";
+inline constexpr std::string_view kTimeoutEnv = "HYPER_MULTICORE_SHMEM_TIMEOUT_SEC";
+inline constexpr std::string_view kDataEngineEnv = "HYPER_MULTICORE_SHMEM_DATA_ENGINE";
+inline constexpr std::string_view kBootstrapEndpointEnv = "HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT";
 
 inline constexpr uint64_t kDefaultHeapSizeBytes = 1073741824ULL;
 inline constexpr uint32_t kDefaultTimeoutSeconds = 120U;
@@ -44,10 +44,10 @@ struct Config {
 };
 
 /**
- * @brief Load and validate the four HYPER_PARALLEL_SHMEM_* Runtime variables.
+ * @brief Load and validate the four HYPER_MULTICORE_SHMEM_* Runtime variables.
  *
  * @return A normalized Config, or ErrorCode::InvalidConfig for an invalid environment value.
  */
 Result<Config> LoadConfigFromEnvironment();
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

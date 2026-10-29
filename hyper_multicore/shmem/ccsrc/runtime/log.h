@@ -15,7 +15,7 @@
 
 #include "runtime/dfx.h"
 
-namespace hyper_parallel::multicore::shmem::runtime::log {
+namespace hyper_multicore::shmem::runtime::log {
 
 /** @brief HP Runtime levels use the values accepted by the CANN SHMEM logger. */
 enum class Level : int32_t {
@@ -47,24 +47,24 @@ void Line(Level level, int32_t root_rank, const char *file, int line, std::strin
 /** @brief Write one Runtime-owned failure without changing the supplied Status. */
 void Failure(const char *file, int line, const DfxFailure &failure) noexcept;
 
-}  // namespace hyper_parallel::multicore::shmem::runtime::log
+}  // namespace hyper_multicore::shmem::runtime::log
 
 #define HP_SM_LOG_INFO(root_rank, operation, stage, ...)                                                         \
   do {                                                                                                           \
-    if (::hyper_parallel::multicore::shmem::runtime::log::is_enabled(                                            \
-          ::hyper_parallel::multicore::shmem::runtime::log::Level::Info)) {                                      \
-      ::hyper_parallel::multicore::shmem::runtime::log::Line(                                                    \
-        ::hyper_parallel::multicore::shmem::runtime::log::Level::Info, root_rank, __FILE__, __LINE__, operation, \
+    if (::hyper_multicore::shmem::runtime::log::is_enabled(                                            \
+          ::hyper_multicore::shmem::runtime::log::Level::Info)) {                                      \
+      ::hyper_multicore::shmem::runtime::log::Line(                                                    \
+        ::hyper_multicore::shmem::runtime::log::Level::Info, root_rank, __FILE__, __LINE__, operation, \
         stage, __VA_ARGS__);                                                                                     \
     }                                                                                                            \
   } while (false)
 
 #define HP_SM_LOG_DEBUG(root_rank, operation, stage, ...)                                                         \
   do {                                                                                                            \
-    if (::hyper_parallel::multicore::shmem::runtime::log::is_enabled(                                             \
-          ::hyper_parallel::multicore::shmem::runtime::log::Level::Debug)) {                                      \
-      ::hyper_parallel::multicore::shmem::runtime::log::Line(                                                     \
-        ::hyper_parallel::multicore::shmem::runtime::log::Level::Debug, root_rank, __FILE__, __LINE__, operation, \
+    if (::hyper_multicore::shmem::runtime::log::is_enabled(                                             \
+          ::hyper_multicore::shmem::runtime::log::Level::Debug)) {                                      \
+      ::hyper_multicore::shmem::runtime::log::Line(                                                     \
+        ::hyper_multicore::shmem::runtime::log::Level::Debug, root_rank, __FILE__, __LINE__, operation, \
         stage, __VA_ARGS__);                                                                                      \
     }                                                                                                             \
   } while (false)

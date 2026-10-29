@@ -16,7 +16,7 @@
 
 from collections import defaultdict
 
-from hyper_parallel.core.multicore.scheduler.config import RuntimeConfigC, TaskDescC, TaskType
+from hyper_multicore.scheduler.config import RuntimeConfigC, TaskDescC, TaskType
 
 
 _DISPATCH = 0

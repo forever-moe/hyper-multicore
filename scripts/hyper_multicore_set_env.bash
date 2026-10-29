@@ -12,7 +12,7 @@
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     echo "ERROR: this script must be sourced so it can update the calling shell." >&2
-    echo "Run: source \"\$(command -v hyper_parallel_multicore_set_env.bash)\"" >&2
+    echo "Run: source \"\$(command -v hyper_multicore_set_env.bash)\"" >&2
     exit 1
 fi
 
@@ -42,10 +42,10 @@ sys.path[:] = [
     for entry in sys.path
     if entry and (Path(entry).resolve() != cwd or cwd in explicit_pythonpath)
 ]
-spec = importlib.util.find_spec("hyper_parallel")
+spec = importlib.util.find_spec("hyper_multicore")
 if spec is None or spec.origin is None:
-    raise SystemExit("hyper_parallel is not installed in the active Python environment")
-print(Path(spec.origin).resolve().parent / "core" / "multicore" / "lib" / "set_env.bash")
+    raise SystemExit("hyper_multicore is not installed in the active Python environment")
+print(Path(spec.origin).resolve().parent / "lib" / "set_env.bash")
 ' 2>&1)
 _hp_multicore_status=$?
 if [[ ${_hp_multicore_status} -ne 0 ]]; then

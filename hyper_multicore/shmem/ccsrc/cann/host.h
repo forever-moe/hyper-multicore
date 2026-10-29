@@ -19,7 +19,7 @@
 #include "runtime/config.h"
 #include "runtime/types.h"
 
-namespace hyper_parallel::multicore::shmem::cann {
+namespace hyper_multicore::shmem::cann {
 
 /**
  * @brief Complete framework-independent input for one CANN SHMEM initialization call.
@@ -107,4 +107,4 @@ runtime::Result<int32_t> query_current_device_index();
 runtime::Result<DeviceIdentity> query_device_identity();
 
 }  // namespace host
-}  // namespace hyper_parallel::multicore::shmem::cann
+}  // namespace hyper_multicore::shmem::cann

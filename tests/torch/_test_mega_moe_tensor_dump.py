@@ -23,10 +23,10 @@ import torch
 import torch.distributed as dist
 import torch_npu  # pylint: disable=unused-import
 
-from hyper_parallel.core.multicore import MegaMoeExperts
-from hyper_parallel.core.multicore.diagnostics import schedule
-from hyper_parallel.core.multicore.diagnostics import dump as tensor_dump
-from tests.torch.multicore import _test_mega_moe as common
+from hyper_multicore import MegaMoeExperts
+from hyper_multicore.diagnostics import schedule
+from hyper_multicore.diagnostics import dump as tensor_dump
+from tests.torch import _test_mega_moe as common
 
 
 _DUMP_TENSORS = (

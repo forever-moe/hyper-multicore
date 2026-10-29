@@ -17,9 +17,9 @@
 from math import prod
 from typing import Any
 
-from hyper_parallel.core.multicore.diagnostics.common.graph import bind_graph_tensor_ports
-from hyper_parallel.core.multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
-from hyper_parallel.core.multicore.modules.mega_mhc.diagnostics import tensor_port
+from hyper_multicore.diagnostics.common.graph import bind_graph_tensor_ports
+from hyper_multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
+from hyper_multicore.modules.mega_mhc.diagnostics import tensor_port
 
 
 def resolve_backward_view(context: L1TensorViewContext) -> L1TensorView:

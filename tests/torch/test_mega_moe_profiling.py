@@ -21,10 +21,10 @@ import os
 from pathlib import Path
 
 from tests.common.mark_utils import arg_mark
-from tests.torch.multicore._evidence_helpers import capture_worker_logs
+from tests.common.multicore._evidence_helpers import capture_worker_logs
 from tests.common.port_utils import allocate_port
-from tests.torch.multicore._case_launcher import run_multicore_case
-from tests.torch.multicore._test_env import (
+from tests.common.multicore._case_launcher import run_multicore_case
+from tests.common.multicore._test_env import (
     multicore_adapter_is_available,
     prepare_multicore_test_environment,
     without_inherited_rank_environment,
@@ -39,7 +39,7 @@ def _prepare_torch_multicore_test_environment() -> None:
     """Activate multicore and require a payload built for Torch."""
     prepare_multicore_test_environment()
     if not multicore_adapter_is_available():
-        raise RuntimeError("MegaMoe Torch ST requires a wheel or PYTHONPATH payload built with --multicore on")
+        raise RuntimeError("MegaMoe Torch ST requires a wheel or PYTHONPATH payload built with bash build.sh")
 
 
 @arg_mark(
@@ -55,10 +55,10 @@ def test_mega_moe_standalone_profiler(monkeypatch, tmp_path: Path) -> None:
     """
     _prepare_torch_multicore_test_environment()
     result_dir = Path(os.getenv("HP_MEGA_MOE_EVIDENCE_DIR", str(tmp_path))) / "profiling"
-    monkeypatch.delenv("HYPER_PARALLEL_SHMEM_HEAP_SIZE", raising=False)
+    monkeypatch.delenv("HYPER_MULTICORE_SHMEM_HEAP_SIZE", raising=False)
     monkeypatch.setenv("HP_MEGA_MOE_WORLD_SIZE", str(_WORLD_SIZE))
     monkeypatch.setenv("HP_MEGA_MOE_PROFILE_RESULT_DIR", str(result_dir))
-    monkeypatch.setenv("HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
+    monkeypatch.setenv("HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT", f"tcp://127.0.0.1:{allocate_port()}")
     with without_inherited_rank_environment(), capture_worker_logs(
         _WORKER, "test_mega_moe_forward_profiling", result_dir / "worker_logs",
     ):

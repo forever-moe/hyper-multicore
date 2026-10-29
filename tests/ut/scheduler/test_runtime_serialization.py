@@ -22,21 +22,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import hyper_parallel
-from hyper_parallel.core.multicore.modules.mega_moe.backward.gen_runtime_data import (
+import hyper_multicore
+from hyper_multicore.modules.mega_moe.backward.gen_runtime_data import (
     build_config_for_rank as build_backward_config,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.backward.storage import can_reuse_backward_dispatch
-from hyper_parallel.core.multicore.modules.mega_moe.backward.graph import (
+from hyper_multicore.modules.mega_moe.backward.storage import can_reuse_backward_dispatch
+from hyper_multicore.modules.mega_moe.backward.graph import (
     build_backward_graph,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.gen_runtime_data import (
+from hyper_multicore.modules.mega_moe.forward.gen_runtime_data import (
     build_config_for_rank as build_forward_config,
 )
-from hyper_parallel.core.multicore.modules.mega_moe.forward.graph import (
+from hyper_multicore.modules.mega_moe.forward.graph import (
     build_forward_graph,
 )
-from hyper_parallel.core.multicore.scheduler.config import (
+from hyper_multicore.scheduler.config import (
     NUM_WORKERS_CUBE,
     RuntimeConfigC,
     TaskDescC,
@@ -45,7 +45,7 @@ from hyper_parallel.core.multicore.scheduler.config import (
     configure_ready_handshake,
     event_workspace_bytes,
 )
-from hyper_parallel.core.multicore.scheduler.runtime import (
+from hyper_multicore.scheduler.runtime import (
     RUNTIME_HEADER_BYTES,
     TASK_DESC_SIZE,
     allocate_runtime_config,
@@ -202,7 +202,7 @@ class TestRuntimeCppReader(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="hp-runtime-reader-") as directory:
             library = Path(directory) / "runtime_reader.so"
             # CI unpacks tests separately from the installed package and its headers.
-            include_root = Path(hyper_parallel.__file__).resolve().parent.parent
+            include_root = Path(hyper_multicore.__file__).resolve().parent.parent
             subprocess.run([
                 compiler, "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                 "-I", str(include_root), str(Path(__file__).with_name("runtime_reader.cpp")), "-o", str(library),

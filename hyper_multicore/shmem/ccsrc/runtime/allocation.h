@@ -16,7 +16,7 @@
 
 #include "runtime/types.h"
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 
 /** @brief Input for one Root WORLD collective symmetric Allocation. */
 struct AllocationSpec {
@@ -115,4 +115,4 @@ class AllocationRegistry final {
   std::unordered_map<uint64_t, AllocationRecord> records_;
 };
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

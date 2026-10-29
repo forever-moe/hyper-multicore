@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple, Union
 
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue
+from hyper_multicore.scheduler.config import TaskSplitValue
 
 
 class OpType(Enum):

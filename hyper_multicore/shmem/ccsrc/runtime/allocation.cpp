@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-namespace hyper_parallel::multicore::shmem::runtime {
+namespace hyper_multicore::shmem::runtime {
 namespace {
 
 Status MakeError(ErrorCode error_code, std::string message) {
@@ -162,4 +162,4 @@ Result<AllocationRecord> AllocationRegistry::Find(uint64_t allocation_id) const 
     "Allocation identity must be issued by this Runtime, but got allocation_id=" + std::to_string(allocation_id)));
 }
 
-}  // namespace hyper_parallel::multicore::shmem::runtime
+}  // namespace hyper_multicore::shmem::runtime

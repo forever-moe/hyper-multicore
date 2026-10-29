@@ -5,7 +5,7 @@
  */
 #include <torch/library.h>
 
-TORCH_LIBRARY_FRAGMENT(hyper_parallel, m) {
+TORCH_LIBRARY_FRAGMENT(hyper_multicore, m) {
   m.def(
     "cann_mhc_pre_sinkhorn("
     "  Tensor x, Tensor phi, Tensor alpha, Tensor bias,"

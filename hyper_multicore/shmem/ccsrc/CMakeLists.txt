@@ -8,11 +8,11 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.18)
-project(hyper_parallel_shmem_torch LANGUAGES CXX)
+project(hyper_multicore_shmem_torch LANGUAGES CXX)
 
 # Build the new SHMEM stack host side: the runtime static library
 # (runtime + CANN host adapter) and the pybind11 Torch binding module
-# (hyper_parallel_shmem_torch.so). The ops kernel library built by the
+# (hyper_multicore_shmem_torch.so). The ops kernel library built by the
 # ccsrc/ops project is linked into the binding module.
 
 set(CMAKE_CXX_STANDARD 17)
@@ -122,7 +122,7 @@ add_compile_definitions(
 
 # Runtime static library: allocation ledger, config, log, runtime state
 # machine and the CANN host adapter. Internal to the binding module.
-add_library(hyper_parallel_shmem_runtime STATIC
+add_library(hyper_multicore_shmem_runtime STATIC
     runtime/allocation.cpp
     runtime/config.cpp
     runtime/log.cpp
@@ -130,47 +130,47 @@ add_library(hyper_parallel_shmem_runtime STATIC
     cann/host.cpp
     cann/log.cpp
 )
-target_include_directories(hyper_parallel_shmem_runtime PRIVATE
+target_include_directories(hyper_multicore_shmem_runtime PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${ASCEND_HOME_PATH}/include
     ${SHMEM_HOME_PATH}/shmem/include
 )
-hp_enable_compile_hardening(hyper_parallel_shmem_runtime)
+hp_enable_compile_hardening(hyper_multicore_shmem_runtime)
 
 if(BUILD_TESTING)
     find_package(Threads REQUIRED)
-    add_executable(hyper_parallel_shmem_native_log_test
-        ${CMAKE_CURRENT_LIST_DIR}/../../../../../tests/ut/core/multicore/shmem/native_log_test.cpp
+    add_executable(hyper_multicore_shmem_native_log_test
+        ${CMAKE_CURRENT_LIST_DIR}/../../../tests/ut/shmem/native_log_test.cpp
         runtime/log.cpp
         cann/log.cpp
     )
-    target_include_directories(hyper_parallel_shmem_native_log_test PRIVATE
+    target_include_directories(hyper_multicore_shmem_native_log_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${ASCEND_HOME_PATH}/include
         ${SHMEM_HOME_PATH}/shmem/include
     )
-    target_link_libraries(hyper_parallel_shmem_native_log_test PRIVATE Threads::Threads)
-    hp_enable_compile_hardening(hyper_parallel_shmem_native_log_test)
-    add_test(NAME shmem_log_capture COMMAND hyper_parallel_shmem_native_log_test capture)
+    target_link_libraries(hyper_multicore_shmem_native_log_test PRIVATE Threads::Threads)
+    hp_enable_compile_hardening(hyper_multicore_shmem_native_log_test)
+    add_test(NAME shmem_log_capture COMMAND hyper_multicore_shmem_native_log_test capture)
     set_tests_properties(shmem_log_capture PROPERTIES TIMEOUT 10)
     foreach(log_level IN ITEMS DEBUG INFO WARN ERROR FATAL INVALID)
         string(TOLOWER ${log_level} log_level_name)
         add_test(NAME shmem_log_level_${log_level_name}
-            COMMAND hyper_parallel_shmem_native_log_test ${log_level})
+            COMMAND hyper_multicore_shmem_native_log_test ${log_level})
         set_tests_properties(shmem_log_level_${log_level_name} PROPERTIES
             ENVIRONMENT "SHMEM_LOG_LEVEL=${log_level}")
     endforeach()
 endif()
 
 # pybind11 Torch binding module, imported by name from Python.
-add_library(hyper_parallel_shmem_torch MODULE
+add_library(hyper_multicore_shmem_torch MODULE
     bindings/torch_bindings.cpp
 )
-set_target_properties(hyper_parallel_shmem_torch PROPERTIES
+set_target_properties(hyper_multicore_shmem_torch PROPERTIES
     PREFIX ""
     SUFFIX ".so"
 )
-target_include_directories(hyper_parallel_shmem_torch PRIVATE
+target_include_directories(hyper_multicore_shmem_torch PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Python3_INCLUDE_DIRS}
     ${TORCH_INCLUDE_ROOT}
@@ -179,13 +179,13 @@ target_include_directories(hyper_parallel_shmem_torch PRIVATE
     ${ASCEND_HOME_PATH}/include
     ${SHMEM_HOME_PATH}/shmem/include
 )
-target_link_libraries(hyper_parallel_shmem_torch PRIVATE
-    hyper_parallel_shmem_runtime
+target_link_libraries(hyper_multicore_shmem_torch PRIVATE
+    hyper_multicore_shmem_runtime
     ${TORCH_LINK_LIBRARIES}
-    "${SHMEM_HOME_PATH}/shmem/lib/libhyper_parallel_shmem_utils.so"
-    "${SHMEM_HOME_PATH}/shmem/lib/libhyper_parallel_shmem.so"
+    "${SHMEM_HOME_PATH}/shmem/lib/libhyper_multicore_shmem_utils.so"
+    "${SHMEM_HOME_PATH}/shmem/lib/libhyper_multicore_shmem.so"
     "${SHMEM_OPS_LIB}"
 )
-hp_enable_elf_hardening(hyper_parallel_shmem_torch)
+hp_enable_elf_hardening(hyper_multicore_shmem_torch)
 
-install(TARGETS hyper_parallel_shmem_torch LIBRARY DESTINATION .)
+install(TARGETS hyper_multicore_shmem_torch LIBRARY DESTINATION .)

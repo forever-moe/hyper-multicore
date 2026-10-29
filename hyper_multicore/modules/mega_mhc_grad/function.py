@@ -20,7 +20,7 @@ from functools import lru_cache
 
 import torch
 
-from hyper_parallel.core.multicore.torch import ops as multicore_ops
+from hyper_multicore.torch import ops as multicore_ops
 
 from ..mega_mhc_common import validate_mega_mhc_native_inputs, validate_mega_mhc_token_count
 from .common import MegaMhcGradCache, MegaMhcGradOutputs, validate_mega_mhc_grad_tensors

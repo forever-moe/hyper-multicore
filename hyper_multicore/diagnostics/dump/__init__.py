@@ -14,9 +14,9 @@
 # ============================================================================
 """Independent L0/L1 MegaKernel Tensor-dump tool."""
 
-from hyper_parallel.core.multicore.diagnostics.dump.api import (
+from hyper_multicore.diagnostics.dump.api import (
     TensorDumpConfig, TorchMegaKernelTensorDumper, tensor_dump,
 )
-from hyper_parallel.core.multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
+from hyper_multicore.diagnostics.dump.l1 import L1TensorView, L1TensorViewContext
 
 __all__ = ["TensorDumpConfig", "TorchMegaKernelTensorDumper", "tensor_dump", "L1TensorView", "L1TensorViewContext"]
