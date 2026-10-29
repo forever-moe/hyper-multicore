@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: pylint --rcfile .pylintrc
+        entry: python scripts/pre-commit/run_pylint.py
         language: python
         additional_dependencies:
           - pylint==3.3.7
@@ -13,7 +13,7 @@ repos:
         pass_filenames: true
       - id: lizard
         name: lizard
-        entry: lizard
+        entry: python scripts/pre-commit/run_lizard.py
         language: python
         additional_dependencies:
           - lizard

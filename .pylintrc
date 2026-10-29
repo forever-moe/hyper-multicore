@@ -2,6 +2,7 @@
 jobs=1
 ignore=CVS,.git,__pycache__,build,dist,.venv,venv
 persistent=no
+load-plugins=pylint_hypermulticore
 
 [MAIN]
 py-version=3.10
