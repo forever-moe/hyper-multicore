@@ -72,9 +72,9 @@ bias初始化为零。`hidden_states`形状为
 传入`image_mask`时，mask形状须为`[batch, sequence]`；启用视觉bias时还须是同一NPU上的连续BOOL Tensor。
 外层BF16 autocast开启时Projection产生BF16 logits；MegaGate将其转换为FP32后调用native Route。
 
-### HyperMegaMhc
+### MegaMhc
 
-`HyperMegaMhc` 执行 shifted mHC 的 block 边界：将上一 block 的输出写入残差流，
+`MegaMhc` 执行 shifted mHC 的 block 边界：将上一 block 的输出写入残差流，
 预测供下一边界使用的混合系数，并产生当前 block 的 RMSNorm 输入。
 所有输入和参数必须位于同一 NPU；使用前构建、安装并激活 native payload。
 
@@ -112,11 +112,11 @@ bias初始化为零。`hidden_states`形状为
 import torch
 import torch_npu
 
-from hyper_multicore import HyperMegaMhc
+from hyper_multicore import MegaMhc
 
 T, H = 128, 5120
 device = torch.device("npu:0")
-layer = HyperMegaMhc(H, device=device)
+layer = MegaMhc(H, device=device)
 previous_output = torch.randn(T, H, device=device, dtype=torch.bfloat16, requires_grad=True)
 residual = torch.randn(T, 4, H, device=device, dtype=torch.bfloat16, requires_grad=True)
 previous_pre = torch.full((T, 4), 0.25, device=device, dtype=torch.float32)
@@ -135,8 +135,8 @@ loss.backward()
 `.eval()` 或 `torch.no_grad()` 不会放宽模块构造限制。
 
 形状、跨设备或尺寸错误抛 `ValueError`；非 Tensor、dtype 或非 NPU 输入错误抛 `TypeError`。
-多 stream 调用前由调用方建立输入数据依赖。应从公共 `HyperMegaMhc` 或前向函数入口导入；
-直接优先导入内部 `mega_mhc_grad.function` 存在循环导入限制。
+多 stream 调用前由调用方建立输入数据依赖。公共模块入口为 `MegaMhc`；
+映射参数及其既有梯度在整网 dtype 转换时保持 FP32。
 
 ### MegaMoeExperts
 
@@ -152,7 +152,6 @@ import torch.distributed as dist
 from hyper_multicore import MegaMoeExperts
 
 experts = MegaMoeExperts(
-    local_num_tokens=1024,
     hidden_size=512,
     intermediate_size=128,
     num_experts=4,
@@ -164,7 +163,8 @@ experts = MegaMoeExperts(
 output = experts(hidden_states, topk_ids, topk_weights)
 ```
 
-`ep_group` may also be a PP/DP-local EP subgroup: pass its size as `ep_size`.
+`ep_group` may also be a PP/DP-local EP subgroup; `ep_size` is inferred from it.
+If supplied explicitly, `ep_size` must match the group size.
 MegaMoE uses group-local expert ownership and does not take a TP-size argument.
 Subgroups exchange independent CANN bootstrap IDs internally and do not use a
 shared WORLD rendezvous port. See the [SHMEM lifecycle](../docs/shmem.md) for
@@ -177,26 +177,20 @@ DSV4.1、Qwen 和 TP/SP/CP/EP/FSDP 模型适配器及其集成测试由 HyperPar
 
 ### 输入与权重
 
-- EP 可以使用 WORLD 或子组，`E` 必须能被 EP 整除。
-  `local_num_tokens=T` 指定固定 token 数，要求 `T` 是 128 的倍数；
-  `max_local_num_tokens=T_cap` 则允许各 rank 的实际 token 数不同，也允许空输入。
-  动态模式按对齐后的上限预留存储，按实际输入长度生成调度计划。
-  这两个 token 数参数互斥；动态执行仅支持 eager 模式，不会添加填充 token。
-  包括空输入 rank 在内，所有 EP rank 必须按相同顺序进入每次正反向，并采用一致的
-  输入、专家权重和路由权重梯度参与策略。实际长度和梯度参与策略随路由计数一起交换。
-  调度范围取组内最大实际长度并向上对齐到 128；全组输入为空时，最小调度范围仍为 128。
-  每个资源组最多缓存四份调度计划；autograd 会保留每次调用所用的计划，直到对应反向完成。
-  pull模式下，空输入仍保留其对称内存基址；仅改变实际输入长度不会触发Runtime restart。
+- 分布式执行必须显式指定 `ep_group`，`E` 必须能被 EP 整除。
+  token 数由每次实际输入决定，无需构造时指定长度或上限，各 rank 可不等长或为空。
+  所有 EP rank 必须按相同顺序进入正反向，并使用一致的梯度参与策略。
+  source/接收容量保留历史高水位，计划按几何桶缓存；待反向图保留原计划。
 - `hidden_states` 扁平后的 token 数为 `T`，`topk_ids`、`topk_weights` 均为 `[T, K]`，
   ID 使用全局专家编号，同一个 token 的 K 个 ID 必须互不重复。
 - 可选的 `tokens_per_expert` 是同 device 上 `[E]` 的精确本 rank histogram。
   省略时内部统计；传入时由调用方保证与当前 ID 一致。contiguous INT32 可直接使用，
   INT64 或非连续输入会转换。
-- 本地参数布局为 `gate_up_weight: [E/EP, H, 2I]`、`down_weight: [E/EP, I, H]`。
-  内部在进入自定义 autograd Function 前对两份权重调用 `.contiguous()`：连续权重直接复用原存储，
-  转置、切片等非连续权重会逐次复制为连续布局，并通过 autograd 将梯度回传到调用方的原始权重。
-  执行器不缓存外部权重的连续副本；非连续布局每次调用都会产生复制开销。
-  普通 gate/up/down 权重转换时，gate、up 分别转置后在末维拼接，down 转置最后两维即可。
+- 默认 `expert_weight_layout="EIO"`：`gate_up_weight: [E/EP, H, 2I]`、
+  `down_weight: [E/EP, I, H]`。EIO 非连续权重每次执行时转换为连续存储，梯度回到原参数。
+  `expert_weight_layout="EOI"`：`gate_up_weight: [E/EP, 2I, H]`、`down_weight: [E/EP, H, I]`，
+  必须使用连续存储，native 直接读取，梯度按相同物理布局返回。
+  gate/up 顺序、SwiGLU 定义和 `swiglu_limit` 必须与来源模型一致。
 
 Router 已有精确计数时，可直接传入：
 
@@ -209,57 +203,31 @@ output = experts(
 )
 ```
 
-### 通信模式与容量
+### 自动 token 与通信容量
 
-构造时通过 `dispatch_mode="push"`（默认）或 `dispatch_mode="pull"` 选择 dispatch；
-两种模式的 combine 均使用 PUT。模式必须在所有 EP rank 上一致，运行中不可修改。
-不同模式可以在同一进程中串行使用，但不能共享同一 workspace。
 
-push 默认从较小的接收容量开始，在路由溢出时在线扩容；配置只有两个 push 专用因子：
+MegaMoe 从实际 forward 输入自动维护容量，无需 token 上限或动态/静态模式开关。
+构造时不分配通信 workspace，首次绑定从128行的最小 source token 容量开始，按实际需求增长并保留高水位。
+调度计划按几何桶缓存，待反向图保留原计划；桶大小不改变真实 token 激活形状。
+初次绑定、进入新桶及扩容有额外成本；稳定容量和已缓存计划可复用。
+
+`dispatch_mode="push"` 为默认值，也可选择 `"pull"`；两者的 combine 都使用 PUT。
+模式须在 EP rank 间一致，不能在同一 workspace 上切换。pull 在容量准备和 claim 后才写 source。
 
 | 参数 | push 默认值 | 作用 |
 | --- | --- | --- |
-| `initial_capacity_factor` | `1.25` | 初始接收容量相对于本地 `T * K` 路由行数的倍数 |
-| `capacity_growth_factor` | `1.25` | 超限时相对于当前接收容量的增长倍数；`1.0` 表示仅满足当次需求 |
+| `initial_capacity_factor` | `1.25` | 首次接收容量相对预留 source 路由行数的倍数 |
+| `capacity_growth_factor` | `1.25` | 接收容量增长倍数；`1.0` 仅满足当次需求 |
 
-两个因子都要求为有限数且不小于1。省略或传入 `None` 表示采用 push 默认值。
-pull 不需要容量因子，显式传入任一数值都会报错。旧 `expert_capacity_factor` 和 `capacity_policy` 参数已移除。
+两个因子须是有限数且不小于1；省略或 `None` 采用默认值。pull 不接受显式容量因子。
+即使 token 数固定，热点也可能触发 push 接收区扩容；路由不丢 token。
+source 容量、调度行数与实际 owner 接收量分别维护：source/返回区按预留容量，
+计算中间张量及待反向激活按实际接收量分配，空 owner 保留一行 ABI 占位。
+pull 的接收区位于普通 HBM，不属于 SHMEM source/返回区。
 
-```python
-# Pass these keywords alongside the model's fixed shape and EP topology.
-push_options = dict(dispatch_mode="push", initial_capacity_factor=1.25, capacity_growth_factor=1.25)
-pull_options = dict(dispatch_mode="pull")
-```
-
-初始容量为 `align128(ceil(initial_capacity_factor * T * K))`，不超过 `EP * T * K` 的保守无损上界。
-需要一次性预留最坏情况时，将 `initial_capacity_factor` 设为 EP 大小。
-当最大目的 rank 接收量 `R_max` 超过当前容量 `C` 时：
-
-```text
-C_new = min(EP * T * K, align128(max(R_max, ceil(capacity_growth_factor * C))))
-```
-
-同一 EP root 的所有 rank 完成在途工作，释放全部受管对称 buffer，finalize 旧 runtime，
-再使用 fresh bootstrap ID 按目标heap大小初始化Runtime并恢复workspace，继续本次 forward；回落时不缩容。
-该路径复用已有路由 counts，未溢出的 forward 不增加负载 collective。
-增长倍数作用于接收容量，不是整个 heap；返回区仍固定为 `T * K` 行，总 heap 向上取整到2 MiB。
-
-pull 的 SHMEM 仅包含 `T * K` 行发送区和返回区，接收区位于普通 HBM、按实际接收量分配。
-两种模式的计算中间张量和待反向保存的 dispatch、up-projection、activation 都按本 rank 实际接收量分配；
-零接收保留一行 ABI 占位。通信任务默认128行，可通过 `dispatch_split`、`combine_split` 分别配置。
-路由不丢 token，热点的普通 HBM 开销仍存在。
-
-共享层、独立的 push/pull workspace 和尚未绑定的层统一计入预算。
-逻辑 workspace 对象保持稳定，因此扩容前的 forward 支持延迟或重复 backward、checkpoint 重算及串行交替 stream。
-每个 root 要求串行执行；push 不支持图捕获，同一 root 下的其他层也不能保留使用旧地址的捕获图。
-外部持有的专家参数不属于 heap，扩容不会移动它们。
-
-若显式设置 `HYPER_MULTICORE_SHMEM_HEAP_SIZE`，物理 heap 直接按此固定预算初始化；push 只在预算内增加逻辑容量。
-当增长余量放不下、而实际需求能放下时，退到最小必要容量。预算不足、存在第二个SHMEM user、
-Allocation清单不完整或活动租约
-会在销毁前阻止扩容；开始释放后若Runtime restart失败，runtime不可继续使用，需退出并重启训练进程。
-自动预算不写入环境变量；实际大小读取 `shmem.debug_state()["config"]["heap_size_bytes"]`。
-扩容有一次性同步和初始化开销，可通过增加初始因子或增长因子减少重建次数。
+扩容可能集体重启同一 SHMEM root 的 runtime，再恢复受管 workspace；外部专家参数不移动。
+`HYPER_MULTICORE_SHMEM_HEAP_SIZE` 可设置固定字节预算；预算不足或不能安全重启时明确失败。
+容量策略、固定预算和失败恢复的完整契约见 [SHMEM runtime restart](../docs/shmem.md#4-runtime-restart)。
 
 ### 资源共享与关闭
 
@@ -310,3 +278,11 @@ MegaKernel 内部阶段采集方式见 [Profiling 指南](../docs/profiling.md)�
 2. **单边通信**：基于内存语义的单边通信（Symmetric Memory）避免传统集合通信的同步开销
 3. **RATR 通信重排**：通过 Rank-Aware Tile Reordering 将 AllToAll 流量在时间轴上均匀分散，避免多源 Rank 同时涌向同一目标，降低尾延迟
 4. **O0 vs O1**：O0 通过 host CPU 调度，O1 调度下沉到 AICore，性能更高但实现难度更大
+
+### 从已有模块接入
+
+`MegaMoeExperts.from_module(source, top_k=..., ep_group=...)` 接受已 materialize 的本地
+SwiGLU `w1/w3/w2` 权重并复制为 EIO 或 EOI Parameters；不会迁移优化器状态。
+`MegaGate.from_module(source, ...)` 绑定原 Router 的投影与修正偏置 Parameters，
+`MegaMhc.from_module(source)` 绑定原四流 mHC 的参数与数学配置，不替换这些参数对象。
+应在模块替换后创建优化器。Gate 修正偏置及 MHC 映射参数在 `.bfloat16()` / `.to()` 时保留 FP32。

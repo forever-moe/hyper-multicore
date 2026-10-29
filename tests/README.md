@@ -115,7 +115,7 @@ launcher 已经负责启动分布式 worker，以下 pytest 命令不要再套�
 | [shmem/test_all_gather.py](torch/shmem/test_all_gather.py) | 按用例为 1、2、4 或 8 | all-gather 边界、数据正确性、stream 可见性和设备 guard |
 
 MoE 基础精度用例需要 2 卡，Router、subgroup、group-list 和计时 smoke 需要 4 卡，
-动态 token 用例需要 8 卡。SHMEM 的设备 guard 用例虽然只有一个 worker，也需要两张可见卡。
+自动 token 用例需要 8 卡，包含变长/空 rank、容量增长及保留图回归。SHMEM 的设备 guard 用例虽然只有一个 worker，也需要两张可见卡。
 `allcards` 标记不等于固定需要 8 卡，实际数量以 launcher 的 `num_proc`/`num_devices` 为准。
 
 ### 查看将要运行的用例

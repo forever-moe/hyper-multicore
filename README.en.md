@@ -47,7 +47,7 @@ outside the checkout.
 Applications import the public components directly:
 
 ```python
-from hyper_multicore import MegaMoeExperts, MegaGate, HyperMegaMhc
+from hyper_multicore import MegaMoeExperts, MegaGate, MegaMhc
 from hyper_multicore.diagnostics import MegaKernelDiagnostics
 ```
 

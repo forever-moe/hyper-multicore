@@ -3,7 +3,8 @@
 本表供过渡期将 HyperParallel 的 multicore PR 移植到 HyperMulticore 时使用。
 来源核对基准为原仓 `5061284e3a9082010e733b38c002a7bf0152d1fc`，
 目标结构核对基点为本仓 `5d7d98ac04c255f4636e2a0f56e3ffef368dd486`。
-它记录路径与结构对应关系，不表示此后原仓 PR 已同步；具体实现以目标分支当前代码为准。
+它记录路径与结构对应关系；后续同步来源包括 #1300（`bcffec39`）、#1343（`5c4caa16`）、
+#1256（`42c2f4d9`）。具体实现以目标分支当前代码为准，验证结果保存在仓库外同步记录。
 过渡结束后删除本表；不将其加入正式产品指南或制品清单。
 
 ## 移植一个 PR
@@ -57,7 +58,7 @@
 
 | 变更涉及内容 | 本仓处理方式 |
 | --- | --- |
-| Python 导入 | `hyper_parallel.core.multicore` → `hyper_multicore`。公共组件名称和调用约定保留；本仓不提供 `hyper_parallel` 兼容包，也不依赖原仓运行或构建 |
+| Python 导入 | `hyper_parallel.core.multicore` → `hyper_multicore`。同步 #1256 后公共 MHC 类名为 `MegaMhc`，MoE 自动推导 token 容量，不再接收 `local_num_tokens` / `max_local_num_tokens` 构造参数；本仓不提供 `hyper_parallel` 兼容包，也不依赖原仓运行或构建 |
 | C++ 命名空间 | 原 `hyper_parallel::multicore::...` → `hyper_multicore::...`，同步迁移 namespace、using 和限定名；例如 SHMEM runtime 的头文件与实现 |
 | Torch dispatcher | `torch.ops.hyper_parallel.*` → `torch.ops.hyper_multicore.*`，C++ 的注册命名空间对应调整；同名算子的 schema 保持兼容 |
 | Torch SO 与加载 | 原 `libhyper_parallel_mega_moe_torch.so`、`libhyper_parallel_mega_gate_torch.so`，以及新仓曾使用的两个组件 SO，均由单个 `libhyper_multicore_torch.so` 承接；目标为 `hyper_multicore_torch`，安装于包的 `lib/framework/torch/` |
@@ -78,7 +79,7 @@
 
 | 原仓内容 | 归属或替代位置 |
 | --- | --- |
-| `C/examples/mega_moe/` 的 Qwen 模型与训练/benchmark 脚本 | 模型和并行框架集成留在 HyperParallel；本仓 `examples/mega_moe_minimal.py`、`mega_moe_benchmark.py` 是独立组件示例，不是一对一搬迁 |
+| `C/examples/` 的 MoE/mHC 模型、训练/benchmark 脚本及对应模型测试 | 模型和并行框架集成留在 HyperParallel；本仓 `examples/mega_moe_minimal.py`、`mega_moe_benchmark.py` 是独立组件示例，不是一对一搬迁 |
 | `tests/torch/multicore/test_deepseek_v41_megamoe.py`、`_test_deepseek_v41_parallel.py`、`_test_deepseek_v41_dynamic_tokens.py` | DeepSeek 模型/并行集成留在原仓 |
 | `tests/torch/multicore/test_mega_gate_deepseek_v41.py`、`_test_mega_gate_deepseek_v41.py` | Gate 模型接入测试留在原仓 |
 | `hyper_parallel/models/`、`tests/ut/auto_models/`、`tests/torch/auto_models/`、DTensor/EP/FSDP/分布式 checkpoint 及相应集成测试 | 留在原仓；若 PR 同时修改组件与这些模块，拆分各仓变更 |

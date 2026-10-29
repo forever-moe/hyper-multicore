@@ -41,7 +41,7 @@ torchrun --standalone --nproc-per-node=2 mega_moe_minimal.py --dispatch-mode pus
 应用程序可直接导入公共组件：
 
 ```python
-from hyper_multicore import MegaMoeExperts, MegaGate, HyperMegaMhc
+from hyper_multicore import MegaMoeExperts, MegaGate, MegaMhc
 from hyper_multicore.diagnostics import MegaKernelDiagnostics
 ```
 
