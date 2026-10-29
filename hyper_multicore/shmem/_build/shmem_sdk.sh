@@ -24,7 +24,9 @@ function hp_prepare_shmem_sdk() {
     local clean_sdk=${4:-off}
     local native_root="${project_root}/build/native"
     local python_bin=python
-    local locked_source_dir="${native_root}/deps/shmem/src"
+    local locked_source_dir
+    local locked_commit
+    local prepared_dependency
     local wrapper="${project_root}/hyper_multicore/shmem/cmake/shmem_wrapper"
     local requested_soc
     local -a requested_socs=()
@@ -139,19 +141,31 @@ print(hashlib.sha256(encoded).hexdigest())
         esac
     done
 
-    "${python_bin}" "${project_root}/hyper_multicore/_build/prepare_dependencies.py" --dependency shmem
-    if [[ ! -d "${locked_source_dir}/src" || ! -f "${locked_source_dir}/CMakeLists.txt" ]]; then
+    if ! prepared_dependency=$("${python_bin}" "${project_root}/hyper_multicore/_build/prepare_dependencies.py" \
+        --dependency shmem); then
         echo "HP_NATIVE_REASON_CODE=SHMEM_SOURCE_NOT_PREPARED"
-        echo "ERROR: Pinned SHMEM source is not prepared at ${locked_source_dir}." >&2
         return 6
     fi
+    locked_source_dir=$("${python_bin}" -c 'import json,sys; print(json.loads(sys.argv[1])["shmem"]["source_dir"])' \
+        "${prepared_dependency}") || return 6
+    locked_commit=$("${python_bin}" -c 'import json,sys; print(json.loads(sys.argv[1])["shmem"]["commit"])' \
+        "${prepared_dependency}") || return 6
 
     if [[ "${clean_sdk}" == "on" ]]; then
         rm -rf "${build_dir}" "${install_root}"
     fi
     rm -rf "${source_dir}"
     mkdir -p "${source_dir}" "${build_dir}"
-    git -C "${locked_source_dir}" archive --format=tar HEAD | tar -xf - -C "${source_dir}"
+    if ! (set -o pipefail; git -C "${locked_source_dir}" archive --format=tar "${locked_commit}" \
+        | tar -xf - -C "${source_dir}"); then
+        echo "HP_NATIVE_REASON_CODE=SHMEM_SOURCE_NOT_PREPARED"
+        return 6
+    fi
+    if [[ ! -d "${source_dir}/src" || ! -f "${source_dir}/CMakeLists.txt" ]]; then
+        echo "HP_NATIVE_REASON_CODE=SHMEM_SOURCE_NOT_PREPARED"
+        echo "ERROR: Locked SHMEM commit lacks SDK sources." >&2
+        return 6
+    fi
     if ! "${python_bin}" - "${project_root}" "${source_dir}" <<'PY'
 import hashlib
 import json

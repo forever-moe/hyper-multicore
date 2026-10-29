@@ -370,16 +370,16 @@ raise SystemExit(0 if find_spec("torch_npu") is not None else 1)
 source "${PROJECT_ROOT}/scripts/check_gcc_version.sh"
 check_gcc_version || fail "UNSUPPORTED_GCC" "Host GCC is outside the supported build range." 6
 
-OPS_NN_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_nn/src"
-OPS_TRANSFORMER_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_transformer/src"
-OPS_TRANSFORMER_MHC_SOURCE_DIR="${NATIVE_ROOT}/deps/ops_transformer_mhc/src"
 MULTICORE_VENDOR_CMAKE="${PROJECT_ROOT}/hyper_multicore/cmake/vendor"
 
 CURRENT_REASON_CODE="MULTICORE_DEPENDENCY_PREPARATION_FAILED"
-"${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/prepare_dependencies.py" \
+PREPARED_DEPENDENCIES=$("${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/prepare_dependencies.py" \
     --dependency ops_nn \
-    --dependency ops_transformer_mhc \
-    --dependency ops_transformer
+    --dependency ops_transformer)
+OPS_NN_SOURCE_DIR=$("${PYTHON_BIN}" -c 'import json,sys; print(json.loads(sys.argv[1])["ops_nn"]["source_dir"])' \
+    "${PREPARED_DEPENDENCIES}")
+OPS_TRANSFORMER_SOURCE_DIR=$("${PYTHON_BIN}" -c 'import json,sys; print(json.loads(sys.argv[1])["ops_transformer"]["source_dir"])' \
+    "${PREPARED_DEPENDENCIES}")
 
 CURRENT_REASON_CODE="SHMEM_SDK_HANDOFF_FAILED"
 # SHMEM publishes this before the vendor work root is fingerprinted.
@@ -523,7 +523,6 @@ for cann_soc in "${CANN_SOCS[@]}"; do
     "${PYTHON_BIN}" "${PROJECT_ROOT}/hyper_multicore/_build/assemble_multicore_source.py" \
         --ops-nn-source "${OPS_NN_SOURCE_DIR}" \
         --ops-transformer-source "${OPS_TRANSFORMER_SOURCE_DIR}" \
-        --ops-transformer-mhc-source "${OPS_TRANSFORMER_MHC_SOURCE_DIR}" \
         --work-dir "${ASSEMBLY_ROOT}"
 
     echo "INFO: building isolated ${cann_soc} vendor input from ${SOURCE_ROOT}"

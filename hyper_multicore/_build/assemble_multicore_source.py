@@ -28,7 +28,7 @@ import tarfile
 import tempfile
 from typing import Any
 
-from prepare_dependencies import verify_git_dependency
+from prepare_dependencies import dependency_revisions, load_dependency_locks, verify_git_dependency
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -65,7 +65,6 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ops-nn-source", required=True)
     parser.add_argument("--ops-transformer-source", required=True)
-    parser.add_argument("--ops-transformer-mhc-source", required=True)
     parser.add_argument("--work-dir", required=True)
     return parser.parse_args()
 
@@ -73,26 +72,26 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     """Verify, export, adapt, and compose the selected kernel sources."""
     args = _parse_args()
-    lock = json.loads(_LOCK_PATH.read_text(encoding="utf-8"))["components"]["multicore"]
+    lock = load_dependency_locks(_LOCK_PATH)
+    transformer_revisions = dependency_revisions(lock["ops_transformer"])
     ops_nn_source = Path(args.ops_nn_source).resolve()
     ops_transformer_source = Path(args.ops_transformer_source).resolve()
-    ops_transformer_mhc_source = Path(args.ops_transformer_mhc_source).resolve()
     work_dir = Path(args.work_dir).resolve()
     _validate_new_work_dir(
         work_dir,
-        (ops_nn_source, ops_transformer_source, ops_transformer_mhc_source),
+        (ops_nn_source, ops_transformer_source),
     )
 
     verify_git_dependency(lock["ops_nn"], ops_nn_source, dependency_name="ops_nn")
     verify_git_dependency(
-        lock["ops_transformer"],
+        transformer_revisions["gmm"],
         ops_transformer_source,
-        dependency_name="ops_transformer",
+        dependency_name="ops_transformer.gmm",
     )
     verify_git_dependency(
-        lock["ops_transformer_mhc"],
-        ops_transformer_mhc_source,
-        dependency_name="ops_transformer_mhc",
+        transformer_revisions["mhc"],
+        ops_transformer_source,
+        dependency_name="ops_transformer.mhc",
     )
 
     ops_nn_copy = work_dir / "adapter-inputs" / "ops-nn"
@@ -107,18 +106,18 @@ def main() -> int:
     _export_git_tree(
         ops_transformer_source,
         transformer_copy,
-        lock["ops_transformer"]["commit"],
+        transformer_revisions["gmm"]["commit"],
         _OPS_TRANSFORMER_PATHS,
     )
     _export_git_tree(
-        ops_transformer_mhc_source,
+        ops_transformer_source,
         transformer_mhc_copy,
-        lock["ops_transformer_mhc"]["commit"],
+        transformer_revisions["mhc"]["commit"],
         _OPS_TRANSFORMER_MHC_PATHS,
     )
     _apply_locked_adapters(ops_nn_copy, lock["ops_nn"])
-    _apply_locked_adapters(transformer_copy, lock["ops_transformer"])
-    _apply_locked_adapters(transformer_mhc_copy, lock["ops_transformer_mhc"])
+    _apply_locked_adapters(transformer_copy, transformer_revisions["gmm"])
+    _apply_locked_adapters(transformer_mhc_copy, transformer_revisions["mhc"])
 
     source_root = work_dir / "source"
     _compose_hyper_multicore_ops(

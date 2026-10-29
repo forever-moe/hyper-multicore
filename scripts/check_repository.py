@@ -19,6 +19,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import runpy
 
 ROOT = Path(__file__).absolute().parents[1]
 
@@ -67,14 +68,16 @@ def main() -> None:
             pattern = rf"{old_name}[/\\]|{old_name}::|{old_name.upper()}_|torch\.ops\.{old_name}"
             if re.search(pattern, source):
                 failures.append(f"Old executable identity/path: {path}")
-    lock = json.loads((ROOT / "hyper_multicore/_build/dependencies.lock.json").read_text(encoding="utf-8"))
+    dependency_helpers = runpy.run_path(str(ROOT / "hyper_multicore/_build/prepare_dependencies.py"))
+    dependencies = dependency_helpers["load_dependency_locks"]()
     patches = 0
-    for dependency in lock["components"]["multicore"].values():
-        for patch in dependency.get("patches", []):
-            patches += 1
-            path = ROOT / patch["path"]
-            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != patch["sha256"]:
-                failures.append(f"Locked patch missing or changed: {path}")
+    for dependency in dependencies.values():
+        for revision in dependency_helpers["dependency_revisions"](dependency).values():
+            for patch in revision.get("patches", []):
+                patches += 1
+                path = ROOT / patch["path"]
+                if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != patch["sha256"]:
+                    failures.append(f"Locked patch missing or changed: {path}")
     if failures:
         raise SystemExit("\n".join(failures))
     print(json.dumps({"python_files_parsed": checked, "locked_patches_verified": patches,
