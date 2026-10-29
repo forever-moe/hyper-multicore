@@ -43,6 +43,7 @@
 | `C/docs/architecture.md`、`build.md`、`shmem.md` | `docs/` 下同名文件 | 文档已移到仓库级，内容按独立包使用方式维护 |
 | `C/docs/mega_kernel_profiling.md` | `docs/profiling.md` | 已改名 |
 | `C/README.md` | `N/README.md` | 组件指南；本仓根中英 README 维护独立包安装与开发入口 |
+| `C/examples/` 的独立 MoE/mHC 小网络及接入指南 | `examples/` | 普通层、all-to-all EP、FP32 master AdamW 做独立适配；真实模型训练配方及完整并行框架留在原仓 |
 | `tests/ut/core/multicore/<相对路径>` | `tests/ut/<相对路径>` | CPU 用例保留后缀路径；不能重新引入旧仓 import 或 fixture |
 | `tests/torch/multicore/<相对路径>` | `tests/torch/<相对路径>` | NPU launcher、worker、SHMEM 和两份 MHC 精度脚本，以下例外优先 |
 | `tests/torch/multicore/_case_launcher.py`、`_evidence_helpers.py`、`_mega_moe_utils.py`、`_test_env.py` | `tests/common/multicore/` 下同名文件 | 4 份 helper 已集中，引用路径同步调整 |
@@ -79,7 +80,6 @@
 
 | 原仓内容 | 归属或替代位置 |
 | --- | --- |
-| `C/examples/` 的 MoE/mHC 模型、训练/benchmark 脚本及对应模型测试 | 模型和并行框架集成留在 HyperParallel；本仓 `examples/mega_moe_minimal.py`、`mega_moe_benchmark.py` 是独立组件示例，不是一对一搬迁 |
 | `tests/torch/multicore/test_deepseek_v41_megamoe.py`、`_test_deepseek_v41_parallel.py`、`_test_deepseek_v41_dynamic_tokens.py` | DeepSeek 模型/并行集成留在原仓 |
 | `tests/torch/multicore/test_mega_gate_deepseek_v41.py`、`_test_mega_gate_deepseek_v41.py` | Gate 模型接入测试留在原仓 |
 | `hyper_parallel/models/`、`tests/ut/auto_models/`、`tests/torch/auto_models/`、DTensor/EP/FSDP/分布式 checkpoint 及相应集成测试 | 留在原仓；若 PR 同时修改组件与这些模块，拆分各仓变更 |
@@ -90,3 +90,11 @@
 
 路径表列出的文件名是定位依据；新增目录或接口时以当前实现和 PR 需求为准。
 本表不授权顺带修复原仓已有问题，也不要求每个 PR 重跑迁移阶段的全量复建或性能验收。
+
+## 独立网络示例的适配边界
+
+`C/examples/` → `examples/`，采用 `examples.*` 模块入口。`_layers.py` 抽取普通层，
+`_native.py` 保留 all-to-all EP 与本地专家参数，`_optimizer.py` 保留 FP32 master AdamW；
+不迁入 DTensor/DeviceMesh/ParallelStyle 或通用优化器工厂。后续 PR 应分别核对这些抽取路径，
+不能整文件覆盖回原仓框架依赖，也不能用 all-gather correctness reference 替换普通 EP benchmark。
+现有 `mega_moe_minimal.py` 是独立化时新增的快速入口；重复的独立计时包装已移除，采样使用 minimal 参数。

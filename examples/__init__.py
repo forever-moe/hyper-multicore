@@ -1,0 +1,1 @@
+"""Standalone HyperMulticore integration examples."""

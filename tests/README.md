@@ -14,7 +14,8 @@
 | 不需要 NPU 的调度、配置、序列化、参数校验和 mock 单测 | [ut/](ut/) |
 | 多个测试共用的参考实现、golden 和启动工具 | [common/multicore/](common/multicore/) |
 
-模型、训练配方或下游并行框架的集成测试由对应消费方维护。本目录测试应能独立运行，
+独立小网络示例的 CPU 接线与训练检查位于 `ut/examples/`，对应 [examples](../examples/README.md)。
+真实模型、训练配方或下游并行框架的集成测试由对应消费方维护。本目录测试应能独立运行，
 不依赖 HyperParallel 或外部模型工程。
 
 ### 目录约定
