@@ -34,7 +34,7 @@ import torch_npu  # noqa: F401  pylint: disable=unused-import
 from hyper_multicore.modules.mega_gate import MegaGate
 from hyper_multicore.modules.mega_gate.diagnostics import MEGA_GATE_ROUTE_GRAD_STAGE_NAMES
 from hyper_multicore.diagnostics import profiler as multicore_profiler
-from hyper_multicore.torch import mega_gate_ops
+from hyper_multicore.torch import ops
 # pylint: enable=wrong-import-position
 
 _DEVICE = torch.device("npu", int(os.environ.get("LOCAL_RANK", "0")))
@@ -239,9 +239,9 @@ def _check_mega_gate_checkpoint_accumulation() -> None:
         (_training_loss(expected) / 2).backward()
         torch.npu.synchronize()
         with patch.object(
-            mega_gate_ops,
+            ops,
             "_mega_gate_route",
-            wraps=mega_gate_ops._mega_gate_route,  # pylint: disable=protected-access
+            wraps=ops._mega_gate_route,  # pylint: disable=protected-access
         ) as launch:
             actual = checkpoint(gate, hidden, mask, use_reentrant=False)
             torch.npu.synchronize()
@@ -523,7 +523,7 @@ def _check_mega_gate_symbol_resolution_concurrency() -> None:
         cases.append((gate, hidden))
     # Keep adapter loading and plan creation outside the race under test. The
     # worker threads should contend only on the ACLNN symbol initialization.
-    mega_gate_ops._load_native()  # pylint: disable=protected-access
+    ops._load_native()  # pylint: disable=protected-access
     cases[0][0]._plan(cases[0][1])  # pylint: disable=protected-access
 
     def run_case(index: int) -> tuple[torch.Tensor, ...]:
@@ -726,7 +726,7 @@ def _check_mega_gate_route_score_operation_order(tokens: int, experts: int) -> N
     gate = _make_gate()
     plan = gate._plan(logits)  # pylint: disable=protected-access
     correction_bias = torch.zeros(experts, device=_DEVICE, dtype=torch.float32)
-    outputs = mega_gate_ops._mega_gate_route(  # pylint: disable=protected-access
+    outputs = ops._mega_gate_route(  # pylint: disable=protected-access
         logits,
         correction_bias,
         correction_bias,
@@ -760,7 +760,7 @@ def _check_mega_gate_route_grad_operation_order(top_k: int) -> None:
     gate = _make_gate()
     plan = gate._plan(logits)  # pylint: disable=protected-access
     runtime = plan.route_grad_k1_runtime if top_k == 1 else plan.route_grad_runtime
-    actual = mega_gate_ops._mega_gate_route_grad(  # pylint: disable=protected-access
+    actual = ops._mega_gate_route_grad(  # pylint: disable=protected-access
         logits.detach(), scores.detach(), selected.detach(), denominator.detach(),
         indices, upstream, runtime.runtime_config, runtime.runtime_config,
         top_k=top_k, routed_scaling_factor=_SCALING,
@@ -791,7 +791,7 @@ def _check_mega_gate_route_grad_batch_parity(tokens: int, top_k: int) -> None:
     plan = gate._plan(logits)  # pylint: disable=protected-access
     runtime = plan.route_grad_k1_runtime if top_k == 1 else plan.route_grad_runtime
     with torch.no_grad():
-        actual = mega_gate_ops._mega_gate_route_grad(  # pylint: disable=protected-access
+        actual = ops._mega_gate_route_grad(  # pylint: disable=protected-access
             logits.detach(), scores.detach(), selected.detach(), denominator.detach(),
             indices, gradient, runtime.runtime_config, runtime.runtime_config,
             top_k=top_k, routed_scaling_factor=_SCALING,
@@ -838,7 +838,7 @@ def _check_mega_gate_route_grad_extremes() -> None:
 
     def _run_route_grad() -> torch.Tensor:
         with torch.no_grad():
-            result = mega_gate_ops._mega_gate_route_grad(  # pylint: disable=protected-access
+            result = ops._mega_gate_route_grad(  # pylint: disable=protected-access
                 reference_logits.detach(),
                 route_scores.detach(),
                 selected_scores.detach(),

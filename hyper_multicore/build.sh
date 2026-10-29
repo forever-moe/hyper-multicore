@@ -610,14 +610,9 @@ cmake -S "${TORCH_SOURCE}" \
     -DPython3_EXECUTABLE="${PYTHON_BIN}"
 cmake --build "${TORCH_BUILD}" --parallel "${NATIVE_JOBS}"
 cmake --install "${TORCH_BUILD}"
-if [[ ! -s "${TORCH_OUTPUT}/libhyper_multicore_mega_moe_torch.so" ]]; then
+if [[ ! -s "${TORCH_OUTPUT}/libhyper_multicore_torch.so" ]]; then
     fail "TORCH_ADAPTER_ARTIFACT_MISSING" \
         "PyTorch multicore adapter was not installed under ${TORCH_OUTPUT}." 13
-fi
-
-if [[ ! -s "${TORCH_OUTPUT}/libhyper_multicore_mega_gate_torch.so" ]]; then
-    fail "TORCH_ADAPTER_ARTIFACT_MISSING" \
-        "Missing MegaGate Torch adapter: ${TORCH_OUTPUT}/libhyper_multicore_mega_gate_torch.so" 12
 fi
 
 CURRENT_REASON_CODE="HOST_ELF_VALIDATION_FAILED"

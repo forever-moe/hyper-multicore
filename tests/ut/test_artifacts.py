@@ -55,6 +55,25 @@ class TestArtifacts(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Missing native payload"):
                 HELPER["validate_payload"](Path(directory), info)
 
+    def test_shared_adapter_rejects_extra_framework_libraries(self):
+        """A stale split adapter cannot be packaged alongside the shared adapter."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            info = {"pta_version": "2.12.0", "artifact_version": "0.1.0.dev0+pt.2.12.0",
+                    "native_sha256": {}}
+            for relative in (*HELPER["REQUIRED_LIBRARIES"], "lib/set_env.bash"):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fixture")
+                if path.suffix == ".so":
+                    info["native_sha256"][relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+            HELPER["validate_payload"](root, info)
+            extra = root / "lib/framework/torch/stale_adapter.so"
+            extra.write_bytes(b"fixture")
+            info["native_sha256"][extra.relative_to(root).as_posix()] = hashlib.sha256(extra.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(RuntimeError, "Expected only the shared Torch adapter"):
+                HELPER["validate_payload"](root, info)
+
     def test_sdist_does_not_inherit_an_enclosing_repository_commit(self):
         """Unpacked sources use their digest, never a parent directory's unrelated Git HEAD."""
         with tempfile.TemporaryDirectory() as directory:

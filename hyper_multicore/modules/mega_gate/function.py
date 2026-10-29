@@ -33,9 +33,9 @@ def _native_ops() -> ModuleType:
     """Load the optional torch_npu adapter only when Device work is requested."""
     global _NATIVE_OPS  # pylint: disable=global-statement
     if _NATIVE_OPS is None:
-        from hyper_multicore.torch import mega_gate_ops  # pylint: disable=import-outside-toplevel
+        from hyper_multicore.torch import ops  # pylint: disable=import-outside-toplevel
 
-        _NATIVE_OPS = mega_gate_ops
+        _NATIVE_OPS = ops
     return _NATIVE_OPS
 
 

@@ -55,21 +55,19 @@ def multicore_test_environment_is_active() -> bool:
     return bool(_active_multicore_vendor_roots())
 
 
-def multicore_adapter_is_available(adapter_name: str = "hyper_multicore_mega_moe_torch") -> bool:
-    """Return whether the active payload contains one requested Torch adapter.
+def multicore_adapter_is_available() -> bool:
+    """Return whether the active payload contains the shared Torch adapter.
 
     An existing adapter is considered available even when it is empty. The
     worker then loads the payload and reports corruption instead of turning a
     broken build into a skip.
 
     Returns:
-        Whether any active multicore payload contains the requested adapter.
+        Whether any active multicore payload contains the shared adapter.
 
     """
-    if adapter_name not in ("hyper_multicore_mega_gate_torch", "hyper_multicore_mega_moe_torch"):
-        raise ValueError(f"unsupported multicore test adapter: {adapter_name!r}")
     for vendor_root in _active_multicore_vendor_roots():
-        adapter = vendor_root.parents[1] / "framework" / "torch" / f"lib{adapter_name}.so"
+        adapter = vendor_root.parents[1] / "framework" / "torch" / "libhyper_multicore_torch.so"
         if adapter.is_file():
             return True
     return False

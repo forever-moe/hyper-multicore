@@ -30,7 +30,7 @@ _WORKER = str(Path(__file__).resolve().parent / "_test_mega_gate.py")
 def _run_worker(case: str) -> None:
     """Run one MegaGate module worker on one NPU."""
     prepare_multicore_test_environment()
-    if not multicore_adapter_is_available("hyper_multicore_mega_gate_torch"):
+    if not multicore_adapter_is_available():
         raise RuntimeError("MegaGate ST requires a wheel or PYTHONPATH payload built with bash build.sh")
     with without_inherited_rank_environment():
         run_multicore_case(_WORKER, case, num_proc=1)

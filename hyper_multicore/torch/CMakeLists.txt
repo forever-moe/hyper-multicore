@@ -79,7 +79,7 @@ foreach(required_path IN ITEMS
     endif()
 endforeach()
 
-add_library(hyper_multicore_mega_moe_torch SHARED
+add_library(hyper_multicore_torch SHARED
     csrc/registration.cpp
     csrc/registration_mhc.cpp
     csrc/mega_mhc.cpp
@@ -87,10 +87,12 @@ add_library(hyper_multicore_mega_moe_torch SHARED
     csrc/mega_moe_grad.cpp
     csrc/moe_token_permute_grad.cpp
     csrc/moe_token_permute_out.cpp
-    csrc/mega_moe_unpermute.cpp)
-target_compile_definitions(hyper_multicore_mega_moe_torch PRIVATE
+    csrc/mega_moe_unpermute.cpp
+    csrc/mega_gate_registration.cpp
+    csrc/mega_gate.cpp)
+target_compile_definitions(hyper_multicore_torch PRIVATE
     _GLIBCXX_USE_CXX11_ABI=${TORCH_CXX11_ABI})
-target_include_directories(hyper_multicore_mega_moe_torch PRIVATE
+target_include_directories(hyper_multicore_torch PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Python3_INCLUDE_DIRS}
     ${TORCH_INCLUDE_ROOT}
@@ -100,26 +102,8 @@ target_include_directories(hyper_multicore_mega_moe_torch PRIVATE
     ${OP_PLUGIN_ROOT}
     ${OP_PLUGIN_ROOT}/op_plugin/include
     ${HP_MULTICORE_VENDOR_ROOT}/op_api/include)
-target_link_libraries(hyper_multicore_mega_moe_torch PRIVATE
+target_link_libraries(hyper_multicore_torch PRIVATE
     ${TORCH_LINK_LIBRARIES})
-hp_enable_elf_hardening(hyper_multicore_mega_moe_torch)
+hp_enable_elf_hardening(hyper_multicore_torch)
 
-add_library(hyper_multicore_mega_gate_torch SHARED
-    csrc/mega_gate_registration.cpp
-    csrc/mega_gate.cpp)
-target_compile_definitions(hyper_multicore_mega_gate_torch PRIVATE
-    _GLIBCXX_USE_CXX11_ABI=${TORCH_CXX11_ABI})
-target_include_directories(hyper_multicore_mega_gate_torch PRIVATE
-    ${Python3_INCLUDE_DIRS}
-    ${TORCH_INCLUDE_ROOT}
-    ${TORCH_INCLUDE_ROOT}/torch/csrc/api/include
-    ${TORCH_NPU_INCLUDE_ROOT}
-    ${TORCH_NPU_INCLUDE_ROOT}/third_party/acl/inc
-    ${OP_PLUGIN_ROOT}
-    ${OP_PLUGIN_ROOT}/op_plugin/include
-    ${HP_MULTICORE_VENDOR_ROOT}/op_api/include)
-target_link_libraries(hyper_multicore_mega_gate_torch PRIVATE
-    ${TORCH_LINK_LIBRARIES})
-hp_enable_elf_hardening(hyper_multicore_mega_gate_torch)
-
-install(TARGETS hyper_multicore_mega_moe_torch hyper_multicore_mega_gate_torch DESTINATION .)
+install(TARGETS hyper_multicore_torch DESTINATION .)

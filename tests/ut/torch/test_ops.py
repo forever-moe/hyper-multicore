@@ -16,6 +16,8 @@
 """Unit tests for native Torch adapter registration diagnostics."""
 
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -65,7 +67,20 @@ class TestTorchOps(unittest.TestCase):
             patch.object(ops.torch.ops.hyper_multicore, "mega_moe_grad", self._backward_op(), create=True) as backward,
         ):
             ops._load_native()
-            ops._load_native()
+            route_inputs = tuple(object() for _ in range(6))
+            grad_inputs = tuple(object() for _ in range(8))
+            with (
+                patch.object(ops.torch.ops.hyper_multicore, "mega_gate_route", create=True) as route,
+                patch.object(ops.torch.ops.hyper_multicore, "mega_gate_route_grad", create=True) as grad,
+            ):
+                self.assertIs(ops._mega_gate_route(
+                    *route_inputs, top_k=6, routed_scaling_factor=1.0, use_vision_bias=False,
+                ), route.return_value)
+                self.assertIs(ops._mega_gate_route_grad(
+                    *grad_inputs, top_k=6, routed_scaling_factor=1.0,
+                ), grad.return_value)
+                route.assert_called_once_with(*route_inputs, 6, 1.0, False)
+                grad.assert_called_once_with(*grad_inputs, 6, 1.0)
             preload.assert_called_once_with(Path("vendor"))
             load.assert_called_once_with("good.so")
             for protocol, alias, message in ((0, "a", "transport ABI"), (1, "e", "storage reuse")):
@@ -74,3 +89,19 @@ class TestTorchOps(unittest.TestCase):
                 backward.default._schema = self._backward_op(alias).default._schema
                 with self.assertRaisesRegex(NativeComponentUnavailableError, message):
                     ops._load_native()
+
+    def test_import_and_gate_bridge_keep_shared_adapter_lazy(self):
+        """Importing the shared wrappers and selecting them must not load native code."""
+        code = """
+import torch
+import torch_npu
+from unittest.mock import patch
+with patch.object(torch.ops, 'load_library') as load:
+    from hyper_multicore.torch import ops
+    from hyper_multicore.modules.mega_gate import function
+    assert function._native_ops() is ops
+    assert hasattr(ops, '_mega_gate_route') and hasattr(ops, '_mega_gate_route_grad')
+    load.assert_not_called()
+"""
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

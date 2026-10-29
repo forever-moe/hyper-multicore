@@ -38,10 +38,15 @@ class BuildPy(build_py):
         """Reject release wheels without native files; permit editable Host development."""
         if info is None and "editable_wheel" not in sys.argv:
             raise RuntimeError("Native payload required for wheels; run bash build.sh. Use editable for Host UT.")
-        super().run()
         if info is not None:
             helper = runpy.run_path(str(ROOT / "hyper_multicore/_build/artifacts.py"))
             helper["validate_payload"](Path(payload), info)
+            # Removed modules and native libraries must not survive an incremental wheel build.
+            package_build = Path(self.build_lib) / "hyper_multicore"
+            if package_build.exists():
+                shutil.rmtree(package_build)
+        super().run()
+        if info is not None:
             shutil.copytree(payload, Path(self.build_lib) / "hyper_multicore", dirs_exist_ok=True)
 
 

@@ -30,8 +30,7 @@ from packaging.version import Version
 
 COMPONENT_VERSION = "0.1.0.dev0"
 REQUIRED_LIBRARIES = (
-    "lib/framework/torch/libhyper_multicore_mega_moe_torch.so",
-    "lib/framework/torch/libhyper_multicore_mega_gate_torch.so",
+    "lib/framework/torch/libhyper_multicore_torch.so",
     "lib/vendors/hyper_multicore_nn/op_api/lib/libcust_opapi.so",
     "shmem/lib/framework/torch/hyper_multicore_shmem_torch.so",
     "shmem/lib/libhyper_multicore_shmem_ops.so",
@@ -149,6 +148,9 @@ def validate_payload(root: Path, info: dict) -> None:
         path = root / relative
         if not path.is_file() or path.stat().st_size == 0:
             raise RuntimeError(f"Missing native payload file: {relative}")
+    adapters = sorted(path.name for path in (root / "lib/framework/torch").glob("*.so"))
+    if adapters != ["libhyper_multicore_torch.so"]:
+        raise RuntimeError(f"Expected only the shared Torch adapter, found: {adapters}")
     hashes = info.get("native_sha256", {})
     for path in root.rglob("*.so"):
         relative = path.relative_to(root).as_posix()
