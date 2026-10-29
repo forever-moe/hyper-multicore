@@ -194,7 +194,7 @@ FILL_CONFIG_REGISTRY: Dict[OpType, Type[FillConfig]] = {
 | `runtime_config.hpp` | 共享数据结构：`RuntimeHeader`、`TaskDesc`、`EventDesc`、`TaskType` 枚举、所有 accessor 函数 |
 | `worker_kernel.h` | `KernelWorkerBase<Derived>` CRTP 基类，含 `Process()`、`WaitForDependency()`、`TriggerEvent()` |
 
-**关键**：`ops/runtime/` 不会直接参与编译。[源码组装器](../_build/assemble_multicore_source.py)
+**关键**：`ops/runtime/` 不会直接参与编译。[源码组装器](../hyper_multicore/_build/assemble_multicore_source.py)
 在隔离的临时源码树中，将整个 `runtime/` 目录分别拷贝到
 `hyper_mega_moe/op_kernel/runtime/` 和 `hyper_mega_moe_grad/op_kernel/runtime/`，使各算子
 `worker_kernel.cpp` 可以用 `#include "runtime/worker_kernel.h"` 访问共享定义。仓内业务源码和上游依赖源码
@@ -322,7 +322,7 @@ dispatch ──► act_grad (GMM1) ───────────────
 `TaskSplitValue` 封装硬件拓扑参数和运行时计数器：
 
 ```python
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue
+from hyper_multicore.scheduler.config import TaskSplitValue
 
 tsv = TaskSplitValue(
     tp=4,              # Tensor Parallel 度
@@ -456,9 +456,9 @@ grouped-matmul 的各 AIC scratch 按 128 字节对齐，每核步长为 `ceil(l
 ### 6.1 正向
 
 ```bash
-# 必须从 hyper-parallel 仓库根目录（hyper_parallel/ 包所在目录）运行
+# 必须从 hyper-multicore 仓库根目录（hyper_multicore/ 包所在目录）运行
 # 直接 python gen_runtime_data.py 会报 ImportError（相对导入）
-python -m hyper_parallel.core.multicore.modules.mega_moe.forward.gen_runtime_data \
+python -m hyper_multicore.modules.mega_moe.forward.gen_runtime_data \
     --tp 4 --ep 4 \
     --seq_size 8192 \
     --all_expert_num 32 \
@@ -486,10 +486,10 @@ python -m hyper_parallel.core.multicore.modules.mega_moe.forward.gen_runtime_dat
 也可在 Python 代码中直接调用：
 
 ```python
-from hyper_parallel.core.multicore.modules.mega_moe.forward.gen_runtime_data import build_config_for_rank
-from hyper_parallel.core.multicore.modules.mega_moe.forward.graph import build_forward_graph
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue
-from hyper_parallel.core.multicore.scheduler.runtime import serialize_runtime_config
+from hyper_multicore.modules.mega_moe.forward.gen_runtime_data import build_config_for_rank
+from hyper_multicore.modules.mega_moe.forward.graph import build_forward_graph
+from hyper_multicore.scheduler.config import TaskSplitValue
+from hyper_multicore.scheduler.runtime import serialize_runtime_config
 
 tsv   = TaskSplitValue(tp=4, ep=4, seq_size=8192, all_expert_num=32, top_k=8)
 graph = build_forward_graph(tsv, dispatch_sv=128, up_proj_sv=4096,
@@ -503,7 +503,7 @@ data = serialize_runtime_config(cfg)
 ### 6.2 反向
 
 ```bash
-python -m hyper_parallel.core.multicore.modules.mega_moe.backward.gen_runtime_data \
+python -m hyper_multicore.modules.mega_moe.backward.gen_runtime_data \
     --tp 4 --ep 4 \
     --seq_size 8192 \
     --all_expert_num 32 \
@@ -535,13 +535,15 @@ python -m hyper_parallel.core.multicore.modules.mega_moe.backward.gen_runtime_da
 Multicore 组件入口负责依赖准备、私有 SHMEM、分 SoC vendor、vendor 合并和 Torch adapter；仓库根入口只调用
 组件脚本并将成功产物纳入完整 wheel。构建命令、环境要求、缓存和 payload 位置统一见
 [构建与交付](build.md)，源码态与 wheel 安装态的 CANN custom OPP 激活方式统一见
-[HyperParallel 安装指南](../../../../docs/installation.md)。
+[独立组件安装指南](../README.md)。
 
 每个 SoC 的 CANN 构建同时生成 `HyperMegaMoe` 和 `HyperMegaMoeGrad`。组件会校验新构建及缓存 vendor，
 并在合并后再次校验四个 `aclnnHyperMegaMoe*` API、kernel object/metadata、SONAME 和运行时依赖。
 私有 SHMEM 库会校验专属 SONAME；所有随包 host 共享库均校验 ELF 架构、安全链接属性、无
 RPATH/RUNPATH 和依赖边界。动态库搜索路径由 `set_env.bash` 在启动 Python 前统一配置。
 
+MegaMoE、MegaGate 和 MegaMHC 通过 `torch/ops.py` 共用一个延迟加载入口，
+首次调用时加载 `lib/framework/torch/libhyper_multicore_torch.so` 并执行 ABI 检查。
 Torch adapter 是由 CMake 构建、通过 `torch.ops.load_library()` 加载的 dispatcher 共享库，不生成
 `PyInit_*` 入口，也不链接 `libpython` 或 `libtorch_python`。adapter 运行时按组件相对路径定位并绝对加载
 自带 vendor；`set_env.bash` 按 CANN custom OPP 契约设置 vendor 的 OPP 与动态库搜索路径。
@@ -556,7 +558,7 @@ MegaMoe 的 `heap_manager.py` 管理容量、workspace布局、heap预算和增�
 SHMEM lifecycle不读取专家容量或workspace布局；配置和restart规则见
 [SHMEM 文档](shmem.md#runtime-restart)。
 
-用户使用方式、输入约束、容量和资源生命周期由组件 [README](../README.md) 统一说明。本节只记录
+用户使用方式、输入约束、容量和资源生命周期由组件 [README](../hyper_multicore/README.md) 统一说明。本节只记录
 `MegaMoeExperts` 内部调用的正反向 native ABI。
 
 ### 8.1 `mega_moe` 正向 ABI
@@ -664,7 +666,7 @@ class OpType(Enum):
 ```
 
 **Step 2** — 在 `scheduler/config.py` 和 C++ `runtime_config.hpp` 同步新增 `TaskType`，然后在
-`tasks/rmsnorm.py` 实现 `FillConfig`。以 [SwiGLUFillConfig](../tasks/swiglu.py) 为 Vector 任务参考：
+`tasks/rmsnorm.py` 实现 `FillConfig`。以 [SwiGLUFillConfig](../hyper_multicore/tasks/swiglu.py) 为 Vector 任务参考：
 
 - 使用 `TaskDescC`、`TensorDescC` 构造任务和输入输出描述。
 - 将任务写入 `cfg.all_tasks`，并把索引写入对应的 `cube_task_indices`、`vector_task_indices` 或
@@ -705,10 +707,10 @@ modules/
 **Step 2** — 在 `graph.py` 构建 DAG：
 
 ```python
-from hyper_parallel.core.multicore.scheduler.graph import (
+from hyper_multicore.scheduler.graph import (
     ComputeGraph, OperatorNode, TensorSpec, SplitSpec, OpType
 )
-from hyper_parallel.core.multicore.scheduler.config import TaskSplitValue
+from hyper_multicore.scheduler.config import TaskSplitValue
 
 def build_attention_fwd_graph(tsv: TaskSplitValue, ...) -> ComputeGraph:
     g = ComputeGraph()
@@ -807,7 +809,7 @@ extern "C" inline __aicore__ void put_mem_signal_kernel(...) {
 }
 ```
 
-**Step 5** — 在[源码组装器](../_build/assemble_multicore_source.py)中登记新算子，使源码组装阶段复制共享的
+**Step 5** — 在[源码组装器](../hyper_multicore/_build/assemble_multicore_source.py)中登记新算子，使源码组装阶段复制共享的
 `runtime/`：
 
 ```python
@@ -825,4 +827,4 @@ _HYPER_OPERATORS = ("hyper_mega_moe", "hyper_mega_moe_grad", "hyper_attn_fwd")
 | AIV hang（无限等待）| N:1 扇入 trigger_count 设置偏大 | 检查 FillConfig 的 trigger_count = 实际上游 tile 数 |
 | GMM workspace 越界 | TILE_M/N 设置过大 | 检查 `tiling_tables.py` 中 workspace 预算 |
 | `runtime/worker_kernel.h` 找不到 | 新算子未纳入隔离源码组装 | 检查 `assemble_multicore_source.py` 的算子列表和 `MULTICORE_SOURCE_ASSEMBLY_FAILED` 日志 |
-| Python `ImportError: scheduler` | 从非包根目录运行 | 从 `hyper-parallel/` 根目录用 `python -m` 方式运行 |
+| Python `ImportError: scheduler` | 从非包根目录运行 | 从 `hyper-multicore/` 根目录用 `python -m` 方式运行 |

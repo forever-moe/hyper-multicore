@@ -2,15 +2,14 @@
 
 Multicore 是独立的 Torch-only 组件，提供芯片内多核 MPMD 并行能力，结合核级内存语义单边通信，增强 MoE 通算掩盖和 MAC 利用率。
 
-用户从独立组件 `hyper_parallel.core.multicore` 显式导入 `MegaGate` 或 `MegaMoeExperts`。
+用户从独立组件 `hyper_multicore` 显式导入 `MegaGate` 或 `MegaMoeExperts`。
 SHMEM 由 Multicore 在内部管理，不提供独立用户接口。
 
-- [构建与交付](docs/build.md)
-- [架构设计与扩展](docs/architecture.md)
-- [MegaKernel Profiling 使用指南](../../../docs/guide/mega_kernel_profiling.md)
-- [MegaKernel Profiling 设计与实现](docs/mega_kernel_profiling_design_and_usage.md)
-- [私有 SHMEM 生命周期](docs/shmem.md)
-- [完整 MegaMoE 样例](examples/mega_moe/README.md)
+- [构建与交付](../docs/build.md)
+- [架构设计与扩展](../docs/architecture.md)
+- [MegaKernel Profiling 使用与设计](../docs/profiling.md)
+- [私有 SHMEM 生命周期](../docs/shmem.md)
+- [独立 MegaMoE 样例](../examples/mega_moe_minimal.py)
 
 ## 核心概念
 
@@ -19,13 +18,13 @@ SHMEM 由 Multicore 在内部管理，不提供独立用户接口。
 - **O0**：通过框架层 host CPU 侧的调度，支持 cube、vector、单边通信算子分核执行
 - **O1**：调度下沉到 AICore，支持 cube、vector、单边通信算子分核执行，进一步提升性能
 
-HyperParallel 基于多核并行实现 MoE 通算掩盖（Multicore MoE-FFN）：将 MoE-FFN 的五个算子
+本组件基于多核并行实现 MoE 通算掩盖（Multicore MoE-FFN）：将 MoE-FFN 的五个算子
 （AllToAll-Dispatch、GMM1、SwiGLU、GMM2、AllToAll-Combine）融合为一个 kernel，由 AIC（AI Cube）和
 AIV（AI Vector）核同时执行，实现通信与计算的细粒度重叠。
 
 ## 接口概览
 
-多核并行模块位于 `hyper_parallel/core/multicore/`，包含以下组件：
+多核并行模块位于 `hyper_multicore/`，包含以下组件：
 
 | 组件 | 说明 |
 |------|------|
@@ -37,7 +36,7 @@ AIV（AI Vector）核同时执行，实现通信与计算的细粒度重叠。
 | `shmem/` | 仅供本组件使用的私有单边通信 |
 
 源码构建生成一个同时包含正反向 kernel 的
-`hyper_parallel_multicore_nn` vendor，并与构建环境对应的框架 adapter 一起进入 wheel 或本地 native payload。
+`hyper_multicore_nn` vendor，并与构建环境对应的框架 adapter 一起进入 wheel 或本地 native payload。
 Torch adapter 是通过 `torch.ops.load_library()` 加载的普通共享库。
 
 ---
@@ -48,12 +47,12 @@ Torch adapter 是通过 `torch.ops.load_library()` 加载的普通共享库。
 
 `MegaGate`提供可独立构造的Gate参数和返回值。NPU上的`sqrtsoftplus`路径使用native Route/RouteGrad，
 投影MatMul由Torch和CANN选型；其他评分函数及非NPU环境使用Torch实现。使用native路径前须以
-`--multicore on`构建并激活生成的multicore payload。
+`bash build.sh`构建并激活生成的multicore payload。
 
 ```python
 import torch
 
-from hyper_parallel.core.multicore import MegaGate
+from hyper_multicore import MegaGate
 
 gate = MegaGate(
     hidden_size=5120,
@@ -73,18 +72,84 @@ bias初始化为零。`hidden_states`形状为
 传入`image_mask`时，mask形状须为`[batch, sequence]`；启用视觉bias时还须是同一NPU上的连续BOOL Tensor。
 外层BF16 autocast开启时Projection产生BF16 logits；MegaGate将其转换为FP32后调用native Route。
 
+### HyperMegaMhc
+
+`HyperMegaMhc` 执行 shifted mHC 的 block 边界：将上一 block 的输出写入残差流，
+预测供下一边界使用的混合系数，并产生当前 block 的 RMSNorm 输入。
+所有输入和参数必须位于同一 NPU；使用前构建、安装并激活 native payload。
+
+构造参数包括 `hidden_size`、`hc_eps=1e-6`、`norm_eps=1e-6`、`num_iters=20`、
+`token_tile=32` 和 `device=None`。固定使用 4 路 residual streams、20 次 Sinkhorn；
+`hidden_size` 必须是正的 128 倍数。模块构造始终要求 `H≤5760`，包括 `.eval()` 模式。
+`token_tile` 必须是正整数。`device=None` 按 Torch 默认设备分配，实际执行前需迁移到 NPU。
+
+设 `S` 为一个或多个 token 维度，展平 token 数为 `T=prod(S)`：
+
+| 输入（按调用顺序） | 形状 | dtype |
+| --- | --- | --- |
+| `previous_output` | `[*S, H]` | BF16 |
+| `residual` | `[*S, 4, H]` | BF16 |
+| `previous_pre_mix` | `[*S, 4]` | FP32 |
+| `previous_post_mix` | `[*S, 4]` | FP32 |
+| `previous_residual_mix` | `[*S, 4, 4]` | FP32 |
+
+返回值是固定顺序的五元组：
+
+| 顺序 | 名称 | 含义 | 形状 / dtype |
+| --- | --- | --- | --- |
+| 1 | `new_residual` | 结合上一输出与残差混合矩阵后的残差流 | `[*S, 4, H]` / BF16 |
+| 2 | `next_pre_mix` | 下一边界的输入混合系数 | `[*S, 4]` / FP32 |
+| 3 | `next_post_mix` | 下一边界的输出分配系数 | `[*S, 4]` / FP32 |
+| 4 | `next_residual_mix` | 下一边界的残差混合矩阵 | `[*S, 4, 4]` / FP32 |
+| 5 | `block_input` | 用 **previous_pre_mix** 混合新残差并做 RMSNorm 的当前 block 输入 | `[*S, H]` / BF16 |
+
+模块持有 FP32 的 `phi [24,4*H]`、`alpha [3]`、`bias [24]`，以及 BF16 的
+`norm_weight [H]`。应按设备迁移模块，保持这些混合 dtype；统一 `.bfloat16()` 会违反输入契约。
+
+以下示例演示单卡前向和自动反向；示例 loss 仅用于展示五个输出参与 autograd，应用中使用真实网络 loss：
+
+```python
+import torch
+import torch_npu
+
+from hyper_multicore import HyperMegaMhc
+
+T, H = 128, 5120
+device = torch.device("npu:0")
+layer = HyperMegaMhc(H, device=device)
+previous_output = torch.randn(T, H, device=device, dtype=torch.bfloat16, requires_grad=True)
+residual = torch.randn(T, 4, H, device=device, dtype=torch.bfloat16, requires_grad=True)
+previous_pre = torch.full((T, 4), 0.25, device=device, dtype=torch.float32)
+previous_post = torch.ones(T, 4, device=device, dtype=torch.float32)
+previous_mix = torch.eye(4, device=device, dtype=torch.float32).expand(T, 4, 4).contiguous()
+outputs = layer(previous_output, residual, previous_pre, previous_post, previous_mix)
+new_residual, next_pre, next_post, next_mix, block_input = outputs
+loss = sum(value.float().square().mean() for value in outputs)
+loss.backward()
+```
+
+训练自动求导路径要求 `T≥max(40, 设备物理 AIV 核数)`；纯前向要求 `T≥1`。
+纯前向函数入口为 `hyper_multicore.modules.mega_mhc.function.hyper_mega_mhc`，显式传入
+五个输入及 `phi, alpha, bias, norm_weight`，设置 `need_backward=False` 后支持 `H≤12288`，
+不建立匹配的反向图。超过模块构造上限时，直接按上述形状和 dtype 准备函数权重；
+`.eval()` 或 `torch.no_grad()` 不会放宽模块构造限制。
+
+形状、跨设备或尺寸错误抛 `ValueError`；非 Tensor、dtype 或非 NPU 输入错误抛 `TypeError`。
+多 stream 调用前由调用方建立输入数据依赖。应从公共 `HyperMegaMhc` 或前向函数入口导入；
+直接优先导入内部 `mega_mhc_grad.function` 存在循环导入限制。
+
 ### MegaMoeExperts
 
 Torch 模型通过 `MegaMoeExperts` 执行 Router 选出的专家，当前支持 Ascend NPU 上的 Torch BF16 训练。
-先按[构建与交付](docs/build.md)选择 `--multicore on`，激活 CANN 和 native payload，
-并为所有 EP rank 配置相同的 `HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT`（如 `tcp://<rank-zero-ip>:<port>`）。
+先按[构建与交付](../docs/build.md)运行 `bash build.sh`，激活 CANN 和 native payload，
+并为所有 EP rank 配置相同的 `HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT`（如 `tcp://<rank-zero-ip>:<port>`）。
 
 在业务进程中选定当前 NPU、初始化 HCCL 进程组后，以下为两卡 EP 示例：
 
 ```python
 import torch
 import torch.distributed as dist
-from hyper_parallel.core.multicore import MegaMoeExperts
+from hyper_multicore import MegaMoeExperts
 
 experts = MegaMoeExperts(
     local_num_tokens=1024,
@@ -102,54 +167,13 @@ output = experts(hidden_states, topk_ids, topk_weights)
 `ep_group` may also be a PP/DP-local EP subgroup: pass its size as `ep_size`.
 MegaMoE uses group-local expert ownership and does not take a TP-size argument.
 Subgroups exchange independent CANN bootstrap IDs internally and do not use a
-shared WORLD rendezvous port. See the [SHMEM lifecycle](docs/shmem.md) for
+shared WORLD rendezvous port. See the [SHMEM lifecycle](../docs/shmem.md) for
 cross-node interface selection and group-local shutdown requirements.
 
-### DSV4.1 的 TP/SP 与 CP 集成
+### 下游模型集成
 
-DSV4.1 适配器在 push 和 pull 模式下均支持 CP，以及配合序列并行使用的 TP。
-开启 TP 时要求 `sequence_parallel: true` 且 `ep_size > 1`；PP 必须保持为 1。
-框架从展平后的 dense DP/CP/TP 域生成 EP mesh。
-路由专家仅沿专家维度分片，保留完整的隐藏维度和中间维度；
-稠密层及共享专家沿用各自的 TP 布局，不支持对路由专家矩阵做张量并行。
-
-MoE 边界直接消费经过 CP 和 TP/SP 划分后的 token。
-VLM 路由时，适配器将 CP 局部图像 mask 对齐到 TP 局部隐藏状态区间。
-共享专家的 TP 通信仍由其嵌套边界负责。
-
-例如，16 个 rank 使用 TP2、CP2、EP16 和 micro-batch size 1 时，可配置为：
-
-```yaml
-accelerator:
-  tp_size: 2
-  cp_size: 2
-  ep_size: 16
-  pp_size: 1
-  sequence_parallel: true
-fsdp_config:
-  dp_shard_size: 8
-  edp_shard_size: 1
-training:
-  global_batch_size: 4
-  micro_batch_size: 1
-```
-
-该配置对应 dense DP4、dense FSDP8 和 expert FSDP1。
-将这些字段合并到现有 DSV4.1 配置中，保留其模块替换和 compute 声明。
-长度为 4096 的序列均匀划分后，每个 rank 向 MegaMoe 提交 1024 行。
-`local_num_tokens` 仍表示经过 CP/SP 划分后的实际行数上限，要求为 128 的倍数，并覆盖最大输入。
-仅减少实际行数、保持容量配置不变，并不会缩小预留容量。
-TP 不会进一步切分路由专家矩阵；本地序列变短也可能降低 MegaMoe 的执行效率。
-
-激活 NPU native payload 后，可执行以下分布式精度对齐测试矩阵：
-
-```bash
-pytest -q tests/torch/multicore/test_deepseek_v41_megamoe.py -k megamoe_parallel
-```
-
-该 8-rank 矩阵覆盖 TP2/CP1、TP1/CP2、TP2/CP2、push/pull、文本/VLM 路由、
-动态本地行数，以及输出、输入梯度、路由梯度、专家梯度和共享专家梯度。
-验证范围为 MoE 模块及实际接入边界，不代表整网训练或性能验收。
+DSV4.1、Qwen 和 TP/SP/CP/EP/FSDP 模型适配器及其集成测试由 HyperParallel 下游维护。
+本仓只提供独立组件及其公共接口，不拥有模型 YAML 或旧仓训练入口，也不依赖下游来完成测试。
 
 ### 输入与权重
 
@@ -230,7 +254,7 @@ pull 的 SHMEM 仅包含 `T * K` 行发送区和返回区，接收区位于普�
 每个 root 要求串行执行；push 不支持图捕获，同一 root 下的其他层也不能保留使用旧地址的捕获图。
 外部持有的专家参数不属于 heap，扩容不会移动它们。
 
-若显式设置 `HYPER_PARALLEL_SHMEM_HEAP_SIZE`，物理 heap 直接按此固定预算初始化；push 只在预算内增加逻辑容量。
+若显式设置 `HYPER_MULTICORE_SHMEM_HEAP_SIZE`，物理 heap 直接按此固定预算初始化；push 只在预算内增加逻辑容量。
 当增长余量放不下、而实际需求能放下时，退到最小必要容量。预算不足、存在第二个SHMEM user、
 Allocation清单不完整或活动租约
 会在销毁前阻止扩容；开始释放后若Runtime restart失败，runtime不可继续使用，需退出并重启训练进程。
@@ -272,11 +296,11 @@ SHMEM Python层以进程级引用计数统一管理Runtime生命周期。整个M
 因此不同配置的孤儿workspace替换不会触发Runtime反复关闭和初始化；更大模型首次绑定可在这份引用内根据
 实际物理heap容量执行Runtime restart。其他Multicore组件直接使用SHMEM时各自持有独立引用；存在第二个user
 时MegaMoe不能独占并重启Runtime。
-重新开启生命周期时，所有 rank 完成关闭后使用新的 `HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT`，
-`HYPER_PARALLEL_SHMEM_HEAP_SIZE` 等堆配置在下一生命周期首次获取引用时重新生效。
+重新开启生命周期时，所有 rank 完成关闭后使用新的 `HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT`，
+`HYPER_MULTICORE_SHMEM_HEAP_SIZE` 等堆配置在下一生命周期首次获取引用时重新生效。
 
-完整 Qwen 接入及启动方式见 [MegaMoe 示例](examples/mega_moe/README.md)。MegaKernel 内部阶段采集方式见
-[MegaKernel Profiling 使用指南](../../../docs/guide/mega_kernel_profiling.md)。
+独立运行方式见 [MegaMoe 示例](../examples/mega_moe_minimal.py)。Qwen 等模型集成留在下游。
+MegaKernel 内部阶段采集方式见 [Profiling 指南](../docs/profiling.md)。
 
 ---
 

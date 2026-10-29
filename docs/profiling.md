@@ -334,7 +334,7 @@ _MegaMoeFunction.forward / backward
 ### 7.1 导入
 
 ```python
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler
+from hyper_multicore.diagnostics import profiler as multicore_profiler
 ```
 
 具体工具从 `diagnostics.profiler` 导入；公共 `diagnostics` 不导入工具。项目为 Torch-only，不设 backend 分派。
@@ -342,7 +342,7 @@ from hyper_parallel.core.multicore.diagnostics import profiler as multicore_prof
 ### 7.2 公共 schedule
 
 ```python
-from hyper_parallel.core.multicore.diagnostics import schedule
+from hyper_multicore.diagnostics import schedule
 
 schedule(
     *,
@@ -519,7 +519,7 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler, schedule as diagnostic_schedule
+from hyper_multicore.diagnostics import profiler as multicore_profiler, schedule as diagnostic_schedule
 
 rank = dist.get_rank()
 schedule = diagnostic_schedule(wait=0, warmup=0, active=1, repeat=1)
@@ -549,7 +549,7 @@ NPU synchronize 和 barrier，能够避免启动偏差被误认为 kernel 内部
 ### 10.2 训练窗口
 
 ```python
-from hyper_parallel.core.multicore.diagnostics import schedule as diagnostic_schedule
+from hyper_multicore.diagnostics import schedule as diagnostic_schedule
 
 capture_schedule = diagnostic_schedule(
     skip_first=5,
@@ -577,7 +577,7 @@ profiler.export_chrome_trace(f"rank{rank}_train_trace.json")
 
 ```python
 from pathlib import Path
-from hyper_parallel.core.multicore.diagnostics import schedule as diagnostic_schedule
+from hyper_multicore.diagnostics import schedule as diagnostic_schedule
 
 
 def on_trace_ready(profiler):
@@ -603,7 +603,7 @@ msprof --output=/path/to/dump python your_program.py
 找到当前 rank/device 对应的原生 `trace.json` 后执行：
 
 ```python
-from hyper_parallel.core.multicore.diagnostics import profiler as multicore_profiler
+from hyper_multicore.diagnostics import profiler as multicore_profiler
 
 multicore_profiler.merge_chrome_traces(
     "/path/to/dump/.../trace.json",
@@ -696,7 +696,7 @@ task ID，不生成 L1 record，也不会在 timeline 中伪造一个不存在�
 ### 11.5 Tensor dump 的使用与存储
 
 ```python
-from hyper_parallel.core.multicore.diagnostics import dump, schedule
+from hyper_multicore.diagnostics import dump, schedule
 
 config = dump.TensorDumpConfig("./dump", level="L0")
 with dump.tensor_dump(config, schedule=schedule(wait=0, warmup=0, active=1, repeat=1)) as dumper:
@@ -747,9 +747,9 @@ Device 等待原依赖后采 before，执行计算并完成 barrier 后采 after
 
 ```bash
 pytest -v \
-  tests/ut/core/multicore/test_profiling.py \
-  tests/ut/core/multicore/test_torch_mega_kernel_profiler.py \
-  tests/ut/core/multicore/test_trace_merger.py
+  tests/ut/test_profiling.py \
+  tests/ut/test_torch_mega_kernel_profiler.py \
+  tests/ut/test_trace_merger.py
 ```
 
 分别覆盖 layout/解析、schedule/session 生命周期和离线对齐诊断。额外的 workspace 与 Torch session
@@ -759,7 +759,7 @@ pytest -v \
 ### 12.2 Torch NPU 测试
 
 ```bash
-pytest -v tests/torch/multicore/test_mega_moe_profiling.py
+pytest -v tests/torch/test_mega_moe_profiling.py
 ```
 
 正式验证至少应检查：
@@ -805,4 +805,4 @@ pytest -v tests/torch/multicore/test_mega_moe_profiling.py
 ## 14. 相关文档
 
 - [MegaMoe Design and Usage](architecture.md)
-- [MegaMoe Torch 示例](../examples/mega_moe/README.md)
+- [MegaMoe Torch 独立示例](../examples/mega_moe_minimal.py)

@@ -49,7 +49,7 @@ Python控制面负责Root协调和引用生命周期；Native Runtime拥有物�
 代码层次如下：
 
 ```text
-core/multicore/shmem/
+hyper_multicore/shmem/
 ├── _runtime.py       # Native与Torch模块的惰性访问
 ├── _lifecycle.py     # Runtime、Root、引用生命周期和Runtime restart
 ├── _api.py           # Allocation和通信接口
@@ -97,13 +97,13 @@ MegaKernel是融合任务的执行方式；MegaMoe是使用该方式的业务模
 
 | 所有者 | 负责的状态与行为 |
 | --- | --- |
-| [Multicore资源管理](../modules/module.py) | 模块成员、兼容资源共享、延迟绑定、协调关闭 |
-| [MegaMoe spec与plan](../modules/mega_moe/plan.py) | 业务规格、正反向计算图、任务/事件配置和tiling |
-| [MegaMoe HeapManager](../modules/mega_moe/heap_manager.py) | reservation、layout、容量预算、替换描述、业务epoch和growth record |
-| [MegaMoe workspace](../modules/mega_moe/workspace.py) | Tensor字段映射、lease、完成事件、反向图使用关系和业务计数器布局 |
-| [SHMEM lifecycle](../shmem/_lifecycle.py) | 引用、Root一致性、阶段收敛、物理restart编排和进程级不可用标记 |
-| [Native Runtime](../shmem/ccsrc/runtime/runtime.cpp) | 设备归属、物理状态、Allocation登记、输入合法性及诊断事实 |
-| [Device Data Plane](../shmem/ccsrc/data_plane/) | 对称地址访问、数据搬移、信号和完成机制 |
+| [Multicore资源管理](../hyper_multicore/modules/module.py) | 模块成员、兼容资源共享、延迟绑定、协调关闭 |
+| [MegaMoe spec与plan](../hyper_multicore/modules/mega_moe/plan.py) | 业务规格、正反向计算图、任务/事件配置和tiling |
+| [MegaMoe HeapManager](../hyper_multicore/modules/mega_moe/heap_manager.py) | reservation、layout、容量预算、替换描述、业务epoch和growth record |
+| [MegaMoe workspace](../hyper_multicore/modules/mega_moe/workspace.py) | Tensor字段映射、lease、完成事件、反向图使用关系和业务计数器布局 |
+| [SHMEM lifecycle](../hyper_multicore/shmem/_lifecycle.py) | 引用、Root一致性、阶段收敛、物理restart编排和进程级不可用标记 |
+| [Native Runtime](../hyper_multicore/shmem/ccsrc/runtime/runtime.cpp) | 设备归属、物理状态、Allocation登记、输入合法性及诊断事实 |
+| [Device Data Plane](../hyper_multicore/shmem/ccsrc/data_plane/) | 对称地址访问、数据搬移、信号和完成机制 |
 
 HeapManager的`ready/failed`描述业务资源是否可用；SHMEM的invalidated描述进程是否允许继续使用物理Runtime。
 物理restart成功后，业务绑定仍可能失败，两者具有不同的状态转换条件。HeapManager在物理失败时查询
@@ -132,8 +132,8 @@ CANN Adapter负责上游机制适配，业务worker负责通信任务及协议�
 
 ### 1.6 跨层协作与Root选择
 
-[_collective](../_collective.py)提供显式group上的结果交换、失败报告和rank诊断。
-[_automatic](../_automatic.py)负责自动清理、框架teardown适配和注册Root选择，结果交换委托给共享模块。
+[_collective](../hyper_multicore/_collective.py)提供显式group上的结果交换、失败报告和rank诊断。
+[_automatic](../hyper_multicore/_automatic.py)负责自动清理、框架teardown适配和注册Root选择，结果交换委托给共享模块。
 其`exchange(value)`和`collective_call(callback, *, stage)`仅使用注册Root；需要显式group的调用使用`_collective`。
 
 MegaMoe资源构造和workspace关闭使用所属HeapManager的`root_group`，不依赖自动清理的Root注册状态。
@@ -162,7 +162,7 @@ Runtime健康，生命周期状态变化由SHMEM前置校验判定。
 SHMEM通过配对接口管理进程内唯一Runtime：
 
 ```python
-from hyper_parallel.core.multicore import shmem
+from hyper_multicore import shmem
 
 shmem.acquire()  # 首个引用初始化Runtime
 try:
@@ -391,18 +391,18 @@ flowchart TB
 
 | 变量 | 默认值 | 语义 |
 | --- | --- | --- |
-| `HYPER_PARALLEL_SHMEM_HEAP_SIZE` | 1073741824（1 GiB） | `acquire()`未显式指定heap大小时使用的默认字节数 |
-| `HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT` | `tcp://127.0.0.1:8662` | 普通WORLD或单进程初始化endpoint；子组及显式heap初始化使用独立unique ID |
+| `HYPER_MULTICORE_SHMEM_HEAP_SIZE` | 1073741824（1 GiB） | `acquire()`未显式指定heap大小时使用的默认字节数 |
+| `HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT` | `tcp://127.0.0.1:8662` | 普通WORLD或单进程初始化endpoint；子组及显式heap初始化使用独立unique ID |
 | `SHMEM_UID_SOCK_IFNAME` | CANN自动选择 | 子组UID bootstrap使用的Host网卡，所有group成员必须可达 |
-| `HYPER_PARALLEL_SHMEM_TIMEOUT_SEC` | 120 | Runtime超时秒数 |
-| `HYPER_PARALLEL_SHMEM_DATA_ENGINE` | `mte` | 数据搬移引擎，当前只支持`mte` |
+| `HYPER_MULTICORE_SHMEM_TIMEOUT_SEC` | 120 | Runtime超时秒数 |
+| `HYPER_MULTICORE_SHMEM_DATA_ENGINE` | `mte` | 数据搬移引擎，当前只支持`mte` |
 | `SHMEM_LOG_LEVEL` | `ERROR` | CANN及HP SHMEM日志级别：`DEBUG`、`INFO`、`WARN`、`ERROR`或`FATAL` |
 | `SHMEM_LOG_TO_STDOUT` | `0` | `1`输出到stdout且不落盘；其他值使用文件sink |
 | `SHMEM_LOG_PATH` | `${HOME}/shmem/log` | CANN及HP SHMEM日志的统一落盘目录 |
 
 CANN和HP日志共用SHMEM原生sink，由它统一补充时间戳、级别、TID和PID，并负责级别过滤、stdout选择及文件
 轮转。原始CANN正文保持`[SHM_SHMEM file:line]`格式；HP正文使用
-`[HP_SHMEM file:line] [rank N] [Operation|Stage] message`。其中`rank N`是当前CANN Root WORLD内的局部
+`[HYPER_MULTICORE_SHMEM file:line] [rank N] [Operation|Stage] message`。其中`rank N`是当前CANN Root WORLD内的局部
 PE编号，不一定等于Torch global rank；归属未知时省略rank。初始化消息中的`NPU device N`是当前进程可见的
 ACL逻辑设备编号，不表示机器上的物理卡号。HP初始化失败汇总行保留符号化Native错误名、数值码
 和精简HBM快照，但不嵌入`cann_detail`；原始CANN日志、异常和`debug_state()`提供完整诊断。
@@ -416,7 +416,7 @@ Subgroup UID bootstrap使用未加密的Host socket。相互独立的group使用
 
 CANN `aclshmem`具有以下安全属性：
 
-- config-store通过`HYPER_PARALLEL_SHMEM_BOOTSTRAP_ENDPOINT`指定的TCP endpoint引导，当前使用
+- config-store通过`HYPER_MULTICORE_SHMEM_BOOTSTRAP_ENDPOINT`指定的TCP endpoint引导，当前使用
   `aclshmemx_set_conf_store_tls(false, nullptr, 0)`，未启用TLS。
 - Root内任意PE可以凭对称地址，通过RMA访问其他PE的heap，不提供PE间访问隔离。
 - MTE数据面传输不加密。
@@ -425,8 +425,8 @@ CANN `aclshmem`具有以下安全属性：
 
 ## 8. 构建与制品
 
-SHMEM没有独立对外构建开关。`--multicore on`会构建Torch Multicore及其必需的SHMEM；`--multicore off`
-不交付两者的Native payload。内部`shmem/build.sh`依次构建AllGather kernel、Runtime和Torch binding。
+SHMEM没有独立对外构建开关。根 `bash build.sh` 必须构建 Torch Multicore 及其必需的 SHMEM，
+任一组件失败则停止产包。内部 `shmem/build.sh` 依次构建 AllGather kernel、Runtime 和 Torch binding。
 
-私有库位于`core/multicore/shmem/lib`，使用专属SONAME，避免与框架自带的通用SHMEM库冲突。制品不携带
+私有库位于`hyper_multicore/shmem/lib`，使用专属SONAME，避免与框架自带的通用SHMEM库冲突。制品不携带
 RPATH或RUNPATH，运行时搜索路径由Multicore `set_env.bash`统一配置。详见[构建与使用](build.md)。

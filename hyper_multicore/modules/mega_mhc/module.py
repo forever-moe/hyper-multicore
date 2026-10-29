@@ -49,7 +49,26 @@ class HyperMegaMhc(torch.nn.Module):
         token_tile: int = DEFAULT_TOKEN_TILE,
         device: Any | None = None,
     ) -> None:
-        """Initialize the fixed-four-stream mHC parameters."""
+        """Initialize the fixed-four-stream shifted mHC parameters.
+
+        Args:
+            hidden_size: Stream width H, a positive multiple of 128, at most 5760.
+                The module enforces this training limit even in eval/no-grad mode.
+            hc_eps: Epsilon used by pre-mix and Sinkhorn mapping prediction.
+            norm_eps: Epsilon used by RMS normalization.
+            num_iters: Sinkhorn iteration count; must be 20.
+            token_tile: Positive integer tokens per scheduler task; defaults to 32.
+            device: Parameter device. None uses Torch's default device; execution
+                requires moving all parameters and inputs to the same NPU.
+
+        Note:
+            phi [24, 4*H], alpha [3] and bias [24] use FP32; norm_weight [H]
+            uses BF16. Move the module by device without casting every parameter
+            to a single dtype. Runtime tensors require NPU and the native payload.
+
+        Raises:
+            ValueError: If hidden_size, num_iters or token_tile is unsupported.
+        """
         super().__init__()
         validate_mega_mhc_hidden_size(hidden_size, need_backward=True)
         if num_iters != MHC_SINKHORN_ITERS:
@@ -87,11 +106,31 @@ class HyperMegaMhc(torch.nn.Module):
         """Advance one shifted mHC block boundary and predict the next mappings.
 
         Args:
-            previous_output: Previous block output.
-            residual: Previous residual streams.
-            previous_pre_mix: Previous pre-mix coefficients.
-            previous_post_mix: Previous post-mix coefficients.
-            previous_residual_mix: Previous residual-mix coefficients.
+            previous_output: BF16 previous block output with shape [*S, H].
+            residual: BF16 residual streams with shape [*S, 4, H]. S contains
+                one or more token dimensions, all inputs share the same NPU.
+            previous_pre_mix: FP32 coefficients [*S, 4] used to form block_input.
+            previous_post_mix: FP32 coefficients [*S, 4] that distribute
+                previous_output into the residual streams.
+            previous_residual_mix: FP32 residual mixing matrices [*S, 4, 4].
+
+        Returns:
+            A five-tensor tuple, in order: new_residual (BF16, [*S, 4, H]),
+            next_pre_mix (FP32, [*S, 4]), next_post_mix (FP32, [*S, 4]),
+            next_residual_mix (FP32, [*S, 4, 4]), block_input (BF16, [*S, H]).
+            The new mappings are for the next boundary; block_input uses
+            previous_pre_mix to combine new_residual, then applies RMSNorm.
+
+        Note:
+            Training uses native autograd. The flattened token count must be
+            at least max(40, physical AIV core count) when backward is needed;
+            forward-only execution requires at least one token. Cross-stream
+            producers must establish dependencies before this call.
+
+        Raises:
+            TypeError: If tensors, dtypes or the NPU device type are invalid.
+            ValueError: If shapes, devices, hidden size or training token count
+                violate the native contract.
         """
         return hyper_mega_mhc(
             previous_output,
