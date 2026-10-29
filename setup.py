@@ -77,6 +77,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/forever-moe/hyper-multicore",
     license="Apache-2.0",
+    license_files=["LICENSE", "Third_Party_Open_Source_Software_Notice"],
     python_requires=">=3.10,<3.13",
     packages=find_packages(include=["hyper_multicore", "hyper_multicore.*"]),
     install_requires=get_install_requires(),

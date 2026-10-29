@@ -30,6 +30,43 @@ HELPER = runpy.run_path(str(Path(__file__).absolute().parents[2] / "hyper_multic
 LOADER = runpy.run_path(str(Path(__file__).absolute().parents[2] / "hyper_multicore/_loader.py"))
 
 
+def _payload_fixture(root, socs=("ascend910b",)):
+    """Create a complete synthetic runtime layout without loading native code."""
+    resources = [*HELPER["REQUIRED_LIBRARIES"], "lib/set_env.bash", "lib/vendors/hyper_multicore_nn/version.info",
+                 "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/liboptiling.so",
+                 "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/lib/linux/aarch64/libcust_opmaster_rt2.0.so",
+                 "lib/vendors/hyper_multicore_nn/op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so"]
+    base = "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe"
+    indexes = {}
+    for soc in socs:
+        binaries = {}
+        resources.extend((f"{base}/config/{soc}/aic-{soc}-ops-info.json",
+                          f"{base}/kernel/config/{soc}/binary_info_config.json"))
+        for operator in ("hyper_mega_moe", "hyper_mega_moe_grad", "hyper_mega_mhc", "hyper_mega_mhc_grad",
+                         "hyper_mega_gate_route", "hyper_mega_gate_route_grad"):
+            variants = ("kernel", "alternative") if operator == "hyper_mega_moe" else ("kernel",)
+            binary_list, bin_list = [], []
+            for variant in variants:
+                relative = f"{soc}/{operator}/{variant}"
+                resources.extend((f"{base}/kernel/{relative}.o", f"{base}/kernel/{relative}.json"))
+                binary_list.append({"binPath": relative + ".o", "jsonPath": relative + ".json"})
+                bin_list.append({"binInfo": {"jsonFilePath": relative + ".json"}})
+            resources.append(f"{base}/kernel/config/{soc}/{operator}.json")
+            indexes[f"{base}/kernel/config/{soc}/{operator}.json"] = {"binList": bin_list}
+            binaries[operator] = {"binaryList": binary_list}
+        indexes[f"{base}/kernel/config/{soc}/binary_info_config.json"] = binaries
+    for relative in resources:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"{}" if path.suffix == ".json" else b"fixture")
+    for relative, contents in indexes.items():
+        (root / relative).write_text(json.dumps(contents), encoding="utf-8")
+    hashes = {relative: hashlib.sha256((root / relative).read_bytes()).hexdigest() for relative in resources}
+    return {"pta_version": "2.12.0", "artifact_version": "0.1.0.dev0+pt.2.12.0", "soc_list": list(socs), "host_arch": "aarch64",
+            "native_sha256": {name: digest for name, digest in hashes.items() if name.endswith(".so")},
+            "payload_sha256": hashes}
+
+
 class TestArtifacts(unittest.TestCase):
     """Keep PTA labels and required native inputs explicit."""
 
@@ -77,6 +114,9 @@ class TestArtifacts(unittest.TestCase):
                         "torch==2.12.0+cpu" if native else "torch", "numpy>=1.26.4,<2",
                     ])
                     self.assertNotIn("extras_require", setup_metadata)
+                    self.assertEqual(setup_metadata["license_files"], [
+                        "LICENSE", "Third_Party_Open_Source_Software_Notice",
+                    ])
 
     def test_missing_pta_is_not_guessed(self):
         """Native identity creation must fail when torch-npu is not installed."""
@@ -96,20 +136,128 @@ class TestArtifacts(unittest.TestCase):
         """A stale split adapter cannot be packaged alongside the shared adapter."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            info = {"pta_version": "2.12.0", "artifact_version": "0.1.0.dev0+pt.2.12.0",
-                    "native_sha256": {}}
-            for relative in (*HELPER["REQUIRED_LIBRARIES"], "lib/set_env.bash"):
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(b"fixture")
-                if path.suffix == ".so":
-                    info["native_sha256"][relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+            info = _payload_fixture(root)
             HELPER["validate_payload"](root, info)
             extra = root / "lib/framework/torch/stale_adapter.so"
             extra.write_bytes(b"fixture")
             info["native_sha256"][extra.relative_to(root).as_posix()] = hashlib.sha256(extra.read_bytes()).hexdigest()
             with self.assertRaisesRegex(RuntimeError, "Expected only the shared Torch adapter"):
                 HELPER["validate_payload"](root, info)
+
+    def test_payload_requires_vendor_resources_and_complete_manifest(self):
+        """Libraries alone and an old SO-only manifest cannot certify a runtime."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            info = _payload_fixture(root)
+            del info["payload_sha256"]
+            with self.assertRaisesRegex(RuntimeError, "Missing complete payload checksum manifest"):
+                HELPER["validate_payload"](root, info)
+            for path in (root / "lib/vendors/hyper_multicore_nn/op_impl").rglob("*"):
+                if path.is_file():
+                    path.unlink()
+            with self.assertRaisesRegex(RuntimeError, "Missing native payload resource"):
+                HELPER["validate_payload"](root, info)
+
+    def test_payload_rejects_missing_resources_even_if_manifest_is_regenerated(self):
+        """Each selected SoC needs all six kernels, metadata, indexes and configs."""
+        base = "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe"
+        cases = (
+            "kernel/ascend910b/hyper_mega_moe/kernel.o",
+            "kernel/ascend910b/hyper_mega_gate_route/kernel.json",
+            "kernel/config/ascend910b/binary_info_config.json",
+            "config/ascend910b/aic-ascend910b-ops-info.json",
+            "kernel/config/ascend910b/hyper_mega_mhc_grad.json",
+            "kernel/ascend910_93/hyper_mega_mhc/kernel.o",
+            "op_tiling/liboptiling.so",
+            "op_tiling/lib/linux/aarch64/libcust_opmaster_rt2.0.so",
+        )
+        for relative in cases:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                info = _payload_fixture(root, ("ascend910b", "ascend910_93"))
+                (root / base / relative).unlink()
+                info["payload_sha256"] = HELPER["_payload_hashes"](root)
+                with self.assertRaisesRegex(RuntimeError, "native payload resource"):
+                    HELPER["validate_payload"](root, info)
+
+    def test_finalize_rejects_missing_variant_and_proto_library(self):
+        """Regenerating hashes cannot hide one missing variant or Host runtime library."""
+        base = "lib/vendors/hyper_multicore_nn/"
+        cases = (
+            base + "op_impl/ai_core/tbe/kernel/ascend910b/hyper_mega_moe/alternative.o",
+            base + "op_impl/ai_core/tbe/kernel/ascend910b/hyper_mega_moe/alternative.json",
+            base + "op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so",
+        )
+        for relative in cases:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "payload"
+                info = _payload_fixture(root)
+                (root / relative).unlink()
+                identity = Path(directory) / "identity.json"
+                identity.write_text(json.dumps(info), encoding="utf-8")
+                with patch.object(sys, "argv", ["artifacts.py", "--output", str(root), "--finalize", str(identity)]):
+                    with self.assertRaisesRegex(RuntimeError, "native payload resource"):
+                        HELPER["main"]()
+                self.assertFalse((root / "build_info.json").exists())
+
+    def test_payload_rejects_changed_missing_and_unrecorded_files(self):
+        """All resources, including scripts and optional vendor files, are protected."""
+        cases = (
+            ("change", "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/kernel/ascend910b/hyper_mega_moe/kernel.json"),
+            ("change", "lib/set_env.bash"),
+            ("delete", "lib/vendors/hyper_multicore_nn/version.info"),
+            ("add", "lib/unrecorded.dat"),
+        )
+        for action, relative in cases:
+            with self.subTest(action=action, relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                info = _payload_fixture(root)
+                path = root / relative
+                if action == "delete":
+                    path.unlink()
+                else:
+                    path.write_bytes(b"changed")
+                with self.assertRaisesRegex(RuntimeError, "Changed payload resource|Payload file set mismatch"):
+                    HELPER["validate_payload"](root, info)
+
+    def test_finalize_records_resources_without_replacing_native_identity(self):
+        """Manifest finalization is repeatable and preserves the original build identity."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "payload"
+            info = _payload_fixture(root)
+            info.pop("payload_sha256")
+            identity = {"build_commit": "original-commit", "source_sha256": "original-source",
+                        "build_fingerprint": "original-fingerprint"}
+            info.update(identity)
+            identity_path = Path(directory) / "identity.json"
+            identity_path.write_text(json.dumps(info), encoding="utf-8")
+            for _ in range(2):
+                with patch.object(sys, "argv", ["artifacts.py", "--output", str(root),
+                                                 "--finalize", str(identity_path)]):
+                    HELPER["main"]()
+                actual = json.loads((root / "build_info.json").read_text(encoding="utf-8"))
+                self.assertEqual({key: actual[key] for key in identity}, identity)
+                self.assertEqual(actual["payload_sha256"], HELPER["_payload_hashes"](root))
+                self.assertNotIn("build_info.json", actual["payload_sha256"])
+                HELPER["validate_payload"](root, actual)
+
+    def test_ini_changes_source_identity_without_git(self):
+        """Operator build configuration contributes to the unpacked source identity."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "hyper_multicore/ops/example/op_host/config/ascend910b/simplified_key.ini"
+            config.parent.mkdir(parents=True)
+            (root / "scripts").mkdir()
+            for name in ("setup.py", "MANIFEST.in", "build.sh", "requirements.txt"):
+                (root / name).write_text("fixture", encoding="utf-8")
+            config.write_text("key=1", encoding="utf-8")
+            original = HELPER["_source_identity"](root)
+            config.write_text("key=2", encoding="utf-8")
+            changed = HELPER["_source_identity"](root)
+            self.assertIsNone(changed["build_commit"])
+            self.assertNotEqual(original["source_sha256"], changed["source_sha256"])
+            config.write_text("key=1", encoding="utf-8")
+            self.assertEqual(original, HELPER["_source_identity"](root))
 
     def test_sdist_does_not_inherit_an_enclosing_repository_commit(self):
         """Unpacked sources use their digest, never a parent directory's unrelated Git HEAD."""

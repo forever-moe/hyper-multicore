@@ -39,6 +39,10 @@ REQUIRED_LIBRARIES = (
     "shmem/lib/shmem/aclshmem_bootstrap_uid.so",
     "shmem/lib/shmem/aclshmem_bootstrap_config_store.so",
 )
+_VENDOR_OPERATORS = (
+    "hyper_mega_moe", "hyper_mega_moe_grad", "hyper_mega_mhc", "hyper_mega_mhc_grad",
+    "hyper_mega_gate_route", "hyper_mega_gate_route_grad",
+)
 
 
 def artifact_version(pta_version: str) -> str:
@@ -69,7 +73,7 @@ def _source_identity(root: Path) -> dict:
     for directory in ("hyper_multicore", "scripts"):
         for path in sorted((root / directory).rglob("*")):
             if path.is_file() and path.suffix in {".py", ".cpp", ".cc", ".h", ".hpp", ".sh", ".bash",
-                                                ".patch", ".json", ".cmake", ".txt"}:
+                                                ".patch", ".json", ".ini", ".cmake", ".txt"}:
                 if any(part in {"lib", "__pycache__"} for part in path.relative_to(root).parts):
                     continue
                 inputs[path.relative_to(root).as_posix()] = _sha256(path)
@@ -132,6 +136,81 @@ def build_identity(root: Path, soc_list: str) -> dict:
     return info
 
 
+def _payload_hashes(root: Path) -> dict[str, str]:
+    """Hash every packaged resource except the identity manifest itself."""
+    return {path.relative_to(root).as_posix(): _sha256(path)
+            for path in sorted(root.rglob("*"))
+            if path.is_file() and path != root / "build_info.json"}
+
+
+def _kernel_references(value):
+    """Read CANN binary and per-operator index references, including nested binInfo."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in {"binPath", "jsonPath", "jsonFilePath"}:
+                if not isinstance(item, str) or not item:
+                    raise RuntimeError(f"Invalid kernel index reference: {key}={item!r}")
+                yield item
+            else:
+                yield from _kernel_references(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _kernel_references(item)
+
+
+def _kernel_index_resources(kernel_root: Path, index: Path) -> list[Path]:
+    """Require every indexed kernel variant and its metadata/object pair."""
+    if not index.is_file():
+        raise RuntimeError(f"Missing native payload resource: {index}")
+    try:
+        contents = json.loads(index.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError) as error:
+        raise RuntimeError(f"Invalid kernel index: {index}") from error
+    references = list(_kernel_references(contents))
+    if not references:
+        raise RuntimeError(f"Missing kernel index references: {index}")
+    required = []
+    for relative in references:
+        path = kernel_root / relative
+        if not path.resolve().is_relative_to(kernel_root.resolve()):
+            raise RuntimeError(f"Kernel index reference outside payload: {relative}")
+        required.append(path)
+        if path.suffix == ".json":
+            required.append(path.with_suffix(".o"))
+    return required
+
+
+def _validate_vendor_resources(root: Path, soc_list: list[str], host_arch: str) -> None:
+    """Apply the vendor build's required runtime-resource checks at packaging time."""
+    if not isinstance(soc_list, list) or not soc_list or any(
+        soc not in {"ascend910b", "ascend910_93"} for soc in soc_list
+    ):
+        raise RuntimeError(f"Missing or unsupported payload SoC list: {soc_list}")
+    if host_arch not in {"aarch64", "x86_64"}:
+        raise RuntimeError(f"Missing or unsupported payload Host architecture: {host_arch}")
+    vendor = root / "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe"
+    host_libraries = [vendor / "op_tiling/liboptiling.so",
+                      vendor / f"op_tiling/lib/linux/{host_arch}/libcust_opmaster_rt2.0.so",
+                      root / f"lib/vendors/hyper_multicore_nn/op_proto/lib/linux/{host_arch}/libcust_opsproto_rt2.0.so"]
+    for soc in soc_list:
+        indexes = [vendor / f"kernel/config/{soc}/binary_info_config.json"]
+        required = [*host_libraries, vendor / f"config/{soc}/aic-{soc}-ops-info.json", *indexes]
+        for operator in _VENDOR_OPERATORS:
+            index = vendor / f"kernel/config/{soc}/{operator}.json"
+            required.append(index)
+            indexes.append(index)
+            for suffix in (".o", ".json"):
+                matches = sorted((vendor / f"kernel/{soc}/{operator}").glob(f"*{suffix}"))
+                if not matches:
+                    raise RuntimeError(f"Missing native payload resource: {soc}/{operator}/*{suffix}")
+                required.extend(matches)
+        for index in indexes:
+            required.extend(_kernel_index_resources(vendor / "kernel", index))
+        for path in required:
+            if not path.is_file() or path.stat().st_size == 0:
+                raise RuntimeError(f"Missing or empty native payload resource: {path.relative_to(root)}")
+
+
 def validate_payload(root: Path, info: dict) -> None:
     """Require the complete native payload and its recorded file hashes.
 
@@ -159,10 +238,22 @@ def validate_payload(root: Path, info: dict) -> None:
     for relative in REQUIRED_LIBRARIES:
         if relative not in hashes:
             raise RuntimeError(f"Missing native checksum: {relative}")
+    _validate_vendor_resources(root, info.get("soc_list"), info.get("host_arch"))
+    recorded = info.get("payload_sha256")
+    if not isinstance(recorded, dict) or not recorded:
+        raise RuntimeError("Missing complete payload checksum manifest: payload_sha256")
+    actual = _payload_hashes(root)
+    missing = sorted(recorded.keys() - actual.keys())
+    unrecorded = sorted(actual.keys() - recorded.keys())
+    if missing or unrecorded:
+        raise RuntimeError(f"Payload file set mismatch: missing={missing}, unrecorded={unrecorded}")
+    for relative, digest in actual.items():
+        if recorded[relative] != digest:
+            raise RuntimeError(f"Changed payload resource: {relative}")
 
 
 def main() -> None:
-    """Prepare identity before compilation, finalize its libraries, or validate a payload."""
+    """Prepare identity before compilation, finalize its resources, or validate a payload."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--soc-list", default="ascend910b,ascend910_93")
@@ -180,6 +271,7 @@ def main() -> None:
         info = json.loads(args.finalize.read_text(encoding="utf-8"))
         info["native_sha256"] = {p.relative_to(args.output).as_posix(): _sha256(p)
                                  for p in args.output.rglob("*.so")}
+        info["payload_sha256"] = _payload_hashes(args.output)
         validate_payload(args.output, info)
         (args.output / "build_info.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     else:
