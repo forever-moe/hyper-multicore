@@ -72,10 +72,10 @@ class BinaryDistribution(Distribution):
 setup(
     name="hyper-multicore",
     version=info["artifact_version"] if info else COMPONENT_VERSION,
-    description="Standalone Ascend multicore operators and PyTorch runtime",
+    description="Huawei Ascend SuperNode Megakernel Development Framework Based on Heterogeneous Multi-Core Scheduling",
     long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    url="https://github.com/forever-moe/hyper-multicore",
+    url="https://github.com/mindspore-ai/hyper-multicore",
     license="Apache-2.0",
     license_files=["LICENSE", "Third_Party_Open_Source_Software_Notice"],
     python_requires=">=3.10,<3.13",
