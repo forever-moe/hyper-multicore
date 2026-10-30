@@ -1,0 +1,328 @@
+OPEN SOURCE SOFTWARE NOTICE
+
+Please note we provide an open source software notice along with this product and/or this product firmware (in the following just “this product”). The open source software licenses are granted by the respective right holders. And the open source licenses prevail all other license information with regard to the respective open source software contained in the product, including but not limited to End User Software Licensing Agreement. This notice is provided on behalf of Huawei Technologies Co. Ltd. and any of its local subsidiaries which may have provided this product to you in your local country.
+
+Warranty Disclaimer
+THE OPEN SOURCE SOFTWARE IN THIS PRODUCT IS DISTRIBUTED IN THE HOPE THAT IT WILL BE USEFUL, BUT WITHOUT ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. SEE THE APPLICABLE LICENSES FOR MORE DETAILS.
+
+Dependency scope and versions
+
+Source incorporated into native artifacts (versions are locked in
+hyper_multicore/_build/dependencies.lock.json):
+- ops-nn v9.1.0.pre:
+  selected RMSNorm/SwiGLU source primitives, with local patches.
+  Source: https://gitcode.com/cann/ops-nn.git
+- ops-transformer: GMM v9.1.0.pre and the MHC sources selected by the lock file:
+  selected GMM/MHC source primitives, with local patches.
+  Source: https://gitcode.com/cann/ops-transformer.git
+- CANN SHMEM (source version selected by the lock file):
+  private SDK/runtime libraries built with the component's locked patches.
+  Source: https://gitcode.com/cann/shmem.git
+  These three repositories use CANN Open Software License Agreement Version 2.0;
+  their license texts are reproduced below.
+
+Framework headers incorporated by compiling the Torch/SHMEM adapters:
+- PyTorch and torch-npu headers come from the selected framework installation.
+- pybind11 headers are supplied by Torch's include/pybind11 tree, not selected
+  from a separately installed pybind11 package. The header version is 3.0.1 in
+  Torch 2.12.0; its BSD license text is reproduced below. Other framework builds
+  must be checked against their supplied headers and licenses.
+
+External runtime dependencies, not bundled as complete distributions:
+- PyTorch and torch-npu shared libraries: the actual framework versions and ABI
+  are recorded in build_info.json. Native wheel metadata pins the actual Torch
+  build; this notice does not fix every build to one framework version.
+- NumPy (numpy>=1.26,<2): Python runtime dependency, provided separately.
+- CANN toolkit/ops, Ascend driver and system libraries: supplied by the runtime
+  environment, separate from the locked CANN source repositories listed above.
+
+The original PyTorch primary BSD notice is retained below. The torch-npu primary
+license text is also provided. Licenses for complete externally installed
+frameworks, NumPy and their bundled third-party components remain with those
+installations; their full license inventories are not reproduced as if those
+packages were redistributed inside this wheel.
+
+Copyright Notice and License Texts
+
+Software: PyTorch (externally installed; primary BSD license)
+Copyright notice:
+From PyTorch:
+
+Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
+Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+
+From Caffe2:
+
+Copyright (c) 2016-present, Facebook Inc. All rights reserved.
+
+All contributions by Facebook:
+Copyright (c) 2016 Facebook Inc.
+
+All contributions by Google:
+Copyright (c) 2015 Google Inc.
+All rights reserved.
+
+All contributions by Yangqing Jia:
+Copyright (c) 2015 Yangqing Jia
+All rights reserved.
+
+All contributions by Kakao Brain:
+Copyright 2019-2020 Kakao Brain
+
+All contributions by Cruise LLC:
+Copyright (c) 2022 Cruise LLC.
+All rights reserved.
+
+All contributions by Arm:
+Copyright (c) 2021, 2023-2024 Arm Limited and/or its affiliates
+
+All contributions from Caffe:
+Copyright(c) 2013, 2014, 2015, the respective contributors
+All rights reserved.
+
+All other contributions:
+Copyright(c) 2015, 2016 the respective contributors
+All rights reserved.
+
+Caffe2 uses a copyright model similar to Caffe: each contributor holds
+copyright over their contributions to Caffe2. The project versioning records
+all such contribution and copyright details. If a contributor wants to further
+mark their specific copyright on a particular contribution, they should
+indicate their copyright solely in the commit message of the change when it is
+committed.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+3. Neither the names of Facebook, Deepmind Technologies, NYU, NEC Laboratories America
+   and IDIAP Research Institute nor the names of its contributors may be
+   used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+
+Software: ops-nn / ops-transformer
+License source: the corresponding upstream repository LICENSE.
+
+CANN Open Software License Agreement Version 2.0
+
+This CANN Open Software License Agreement Version 2.0 (hereinafter referred to as this "Agreement") is a legal agreement between you and Huawei, and it governs your use, modification, or distribution of CANN Open Software (hereinafter referred to as "Software"). Please read this Agreement carefully.
+
+If you are entering into this Agreement on behalf of a company or other legal entity, you represent that you have the legal authority to bind that entity to this Agreement, in which case "you" will mean the entity you represent.
+
+BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU AGREE YOU HAVE FULLY UNDERSTOOD AND ACCEPTED THE TERMS CONTAINED HEREIN. IF YOU DO NOT AGREE TO ANY OF THE TERMS OF THIS AGREEMENT, OR IF YOU DO NOT QUALIFY FOR AGREEING TO THIS AGREEMENT, YOU ARE NOT AUTHORIZED TO AND SHALL NOT DOWNLOAD, INSTALL, OR MAKE ANY USE OF THE SOFTWARE.
+
+1. Definition
+
+1.1   Software means the APIs, source code files, binaries, and related documents of Compute Architecture for Neural Networks("CANN") that are licensable by Huawei, and provided and licensed under this Agreement.
+
+1.2   Huawei AI Processors mean AI chipsets (i) branded with "Ascend", "Kirin"," Yueying" or other brands owned or controlled by Huawei; or (ii) manufactured (including have manufactured), supplied (including have supplied) or designed (including have designed) by Huawei.
+
+2.  Grant of Intellectual Property Rights
+2.1 Subject to the terms and conditions of this Agreement, including your full compliance thereof, Huawei hereby grants you a limited, worldwide, royalty-free, non-transferable, non-sublicensable, and revocable license for you to (i) download, use, modify, integrate, and distribute the Software or its derivative works for the purpose of developing software solely for use in systems with Huawei AI Processors and/or Software, and (ii) distribute any software developed based upon Software and/or its derivative works solely for use in systems with Huawei AI Processors and/or Software.
+
+3.  Restrictions
+3.1 You are not authorized to, and shall not use, modify, or distribute this Software or its derivative works for any other purposes than those expressly permitted by this Agreement. You shall not make any use of the Software or its derivative works to develop or distribute any software for use in systems with processors other than Huawei AI Processors. All rights not expressly granted herein are expressly reserved by Huawei.
+
+3.2 You are not authorized to, and shall not remove, obscure, or alter any copyright or other notices in this Software or any part of it.
+
+3.3 Distribution Restrictions
+You may distribute the Software or its derivative works in any medium, whether in source or executable forms, for the purpose stipulated in Section 2; provided that you provide recipients with a copy of this Agreement, and retain all notices in the Software.
+
+4. Disclaimer of Warranty and Limitation of Liability
+THE SOFTWARE IS PROVIDED WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. IN NO EVENT SHALL HUAWEI OR ANY OTHER COPYRIGHT HOLDER BE LIABLE TO YOU FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO ANY DIRECT, OR INDIRECT, SPECIAL OR CONSEQUENTIAL DAMAGES ARISING FROM YOUR USE OR INABILITY TO USE THE SOFTWARE, IN WHOLE OR IN PART, NO MATTER HOW IT IS CAUSED OR THE LEGAL THEORY IT IS BASED ON, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+5. Termination
+5.1 This Agreement will continue to apply until terminated by either you or Huawei as described below:
+a．You may terminate this Agreement by ceasing your use of the Software;
+b.  Huawei may at any time, terminate this Agreement if: (i) you fail to comply with any term of this Agreement; or (ii) you directly or indirectly initiate any legal proceeding against any individual or entity by alleging that the Software or any part of it infringes your intellectual property rights.
+5.2 By termination, all the rights granted to you under this Agreement are terminated, and you shall cease to use and delete this Software or any derivative works immediately. All rights granted to you under this Agreement shall hereby be void ab initio in the event of termination in accordance with Section 5.1. b above. Huawei reserves the right to pursue any and all legal remedies available to enforce the terms and conditions of this Agreement or to protect Huawei’s intellectual property rights for such breach or violation. All provisions shall survive the termination of this Agreement except for Section 2 and Section 3.3.
+
+6. MISCELLANEOUS
+If the application of any provision of this Agreement to any particular facts or circumstances is held to be invalid or unenforceable by a court of competent jurisdiction, then (a) the validity and enforceability of such provision as applied to any other particular facts or circumstances and the validity of other provisions of this Agreement shall not in any way be affected or impaired thereby and (b) such provision shall be enforced to the maximum extent possible so as to affect the intent of the you and Huawei and reformed without further action by you and Huawei to the extent necessary to make such provision valid and enforceable.
+
+END OF THE TERMS AND CONDITIONS
+
+
+Software: CANN SHMEM
+License source: the corresponding upstream repository LICENSE.
+
+CANN Open Software License Agreement Version 2.0
+
+This CANN Open Software License Agreement Version 2.0 (hereinafter referred to as this "Agreement") is a legal agreement between you and Huawei, and it governs your use, modification, or distribution of CANN Open Software (hereinafter referred to as "Software"). Please read this Agreement carefully.
+
+If you are entering into this Agreement on behalf of a company or other legal entity, you represent that you have the legal authority to bind that entity to this Agreement, in which case "you" will mean the entity you represent.
+
+BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU AGREE YOU HAVE FULLY UNDERSTOOD AND ACCEPTED THE TERMS CONTAINED HEREIN. IF YOU DO NOT AGREE TO ANY OF THE TERMS OF THIS AGREEMENT, OR IF YOU DO NOT QUALIFY FOR AGREEING TO THIS AGREEMENT, YOU ARE NOT AUTHORIZED TO AND SHALL NOT DOWNLOAD, INSTALL, OR MAKE ANY USE OF THE SOFTWARE.
+
+1. Definition
+
+1.1   Software means the APIs, source code files, binaries, and related documents of Compute Architecture for Neural Networks("CANN") that are licensable by Huawei, and provided and licensed under this Agreement.
+
+1.2   Huawei AI Processors mean AI chipsets (i) branded with "Ascend", "Kirin", "Yueying" or other brands owned or controlled by Huawei; or (ii) manufactured (including have manufactured), supplied (including have supplied) or designed (including have designed) by Huawei.
+
+2.  Grant of Intellectual Property Rights
+2.1 Subject to the terms and conditions of this Agreement, including your full compliance thereof, Huawei hereby grants you a limited, worldwide, royalty-free, non-transferable, non-sublicensable, and revocable license for you to (i) download, use, modify, integrate, and distribute the Software or its derivative works for the purpose of developing software solely for use in systems with Huawei AI Processors and/or Software, and (ii) distribute any software developed based upon Software and/or its derivative works solely for use in systems with Huawei AI Processors and/or Software.
+
+3.  Restrictions
+3.1 You are not authorized to, and shall not use, modify, or distribute this Software or its derivative works for any other purposes than those expressly permitted by this Agreement. You shall not make any use of the Software or its derivative works to develop or distribute any software for use in systems with processors other than Huawei AI processors. All rights not expressly granted herein are expressly reserved by Huawei.
+
+3.2 You are not authorized to, and shall not remove, obscure, or alter any copyright or other notices in this Software or any part of it.
+
+3.3 Distribution Restrictions
+You may distribute the Software or its derivative works in any medium, whether in source or executable forms, for the purpose stipulated in Section 2; provided that you provide recipients with a copy of this Agreement, and retain all notices in the Software.
+
+4. Disclaimer of Warranty and Limitation of Liability
+THE SOFTWARE IS PROVIDED WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. IN NO EVENT SHALL HUAWEI OR ANY OTHER COPYRIGHT HOLDER BE LIABLE TO YOU FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO ANY DIRECT, OR INDIRECT, SPECIAL OR CONSEQUENTIAL DAMAGES ARISING FROM YOUR USE OR INABILITY TO USE THE SOFTWARE, IN WHOLE OR IN PART, NO MATTER HOW IT IS CAUSED OR THE LEGAL THEORY IT IS BASED ON, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+5. Termination
+5.1 This Agreement will continue to apply until terminated by either you or Huawei as described below:
+a．You may terminate this Agreement by ceasing your use of the Software;
+b.  Huawei may at any time, terminate this Agreement if: (i) you fail to comply with any term of this Agreement; or (ii) you directly or indirectly initiate any legal proceeding against any individual or entity by alleging that the Software or any part of it infringes your intellectual property rights.
+5.2 By termination, all the rights granted to you under this Agreement are terminated, and you shall cease to use and delete this Software or any derivative works immediately. All rights granted to you under this Agreement shall hereby be void ab initio in the event of termination in accordance with Section 5.1. b above. Huawei reserves the right to pursue any and all legal remedies available to enforce the terms and conditions of this Agreement or to protect Huawei’s intellectual property rights for such breach or violation. All provisions shall survive the termination of this Agreement except for Section 2 and Section 3.3.
+
+6. MISCELLANEOUS
+If the application of any provision of this Agreement to any particular facts or circumstances is held to be invalid or unenforceable by a court of competent jurisdiction, then (a) the validity and enforceability of such provision as applied to any other particular facts or circumstances and the validity of other provisions of this Agreement shall not in any way be affected or impaired thereby and (b) such provision shall be enforced to the maximum extent possible so as to affect the intent of the you and Huawei and reformed without further action by you and Huawei to the extent necessary to make such provision valid and enforceable.
+
+END OF THE TERMS AND CONDITIONS
+
+
+Software: torch-npu (externally installed; primary license)
+
+From PyTorch:
+
+Copyright (c) 2020, Huawei Technologies Co., Ltd
+Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
+Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+
+From Caffe2:
+
+Copyright (c) 2016-present, Facebook Inc. All rights reserved.
+
+All contributions by Facebook:
+Copyright (c) 2016 Facebook Inc.
+
+All contributions by Google:
+Copyright (c) 2015 Google Inc.
+All rights reserved.
+
+All contributions by Yangqing Jia:
+Copyright (c) 2015 Yangqing Jia
+All rights reserved.
+
+All contributions by Kakao Brain:
+Copyright 2019-2020 Kakao Brain
+
+All contributions by Cruise LLC:
+Copyright (c) 2022 Cruise LLC.
+All rights reserved.
+
+All contributions from Caffe:
+Copyright(c) 2013, 2014, 2015, the respective contributors
+All rights reserved.
+
+All other contributions:
+Copyright(c) 2015, 2016 the respective contributors
+All rights reserved.
+
+Caffe2 uses a copyright model similar to Caffe: each contributor holds
+copyright over their contributions to Caffe2. The project versioning records
+all such contribution and copyright details. If a contributor wants to further
+mark their specific copyright on a particular contribution, they should
+indicate their copyright solely in the commit message of the change when it is
+committed.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+3. Neither the names of Facebook, Deepmind Technologies, NYU, NEC Laboratories America
+   and IDIAP Research Institute nor the names of its contributors may be
+   used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Software: pybind11 headers supplied by PyTorch
+
+Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Please also refer to the file .github/CONTRIBUTING.md, which clarifies licensing of
+external contributions to this project including patches, pull requests, etc.
