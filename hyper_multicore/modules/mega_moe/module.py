@@ -600,8 +600,13 @@ class MegaMoeExperts(MulticoreModule):
 
         Raises:
             ValueError: EOI expert weights are noncontiguous.
+            RuntimeError: The current NPU stream is being captured.
 
         Note:
+            Automatic token management requires eager execution for both push
+            and pull. NPU graph capture is unsupported, even with stable token
+            counts and capacity.
+
             ``tokens_per_expert`` must describe the current ``topk_ids`` exactly.
             The steady-state path validates metadata but deliberately does not
             rebuild and compare the histogram.

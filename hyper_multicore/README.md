@@ -104,7 +104,9 @@ bias初始化为零。`hidden_states`形状为
 | 5 | `block_input` | 用 **previous_pre_mix** 混合新残差并做 RMSNorm 的当前 block 输入 | `[*S, H]` / BF16 |
 
 模块持有 FP32 的 `phi [24,4*H]`、`alpha [3]`、`bias [24]`，以及 BF16 的
-`norm_weight [H]`。应按设备迁移模块，保持这些混合 dtype；统一 `.bfloat16()` 会违反输入契约。
+`norm_weight [H]`。正常调用模块 `.bfloat16()` 或 `.to()` 时，`phi/alpha/bias` 及其
+已有梯度会保留 FP32，并随模块迁移设备。直接手动修改这些参数的 dtype 不受该机制保护，
+仍须满足上述混合 dtype 输入契约。
 
 以下示例演示单卡前向和自动反向；示例 loss 仅用于展示五个输出参与 autograd，应用中使用真实网络 loss：
 
@@ -213,6 +215,9 @@ MegaMoe 从实际 forward 输入自动维护容量，无需 token 上限或动�
 
 `dispatch_mode="push"` 为默认值，也可选择 `"pull"`；两者的 combine 都使用 PUT。
 模式须在 EP rank 间一致，不能在同一 workspace 上切换。pull 在容量准备和 claim 后才写 source。
+
+当前自动 token 模式下，push/pull 均要求 eager 执行，不支持 NPU graph capture；
+即使 token 数和容量已稳定，检测到当前 stream 正在捕获时仍会抛出 `RuntimeError`。
 
 | 参数 | push 默认值 | 作用 |
 | --- | --- | --- |
