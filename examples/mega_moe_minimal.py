@@ -58,7 +58,7 @@ def main(default_warmup: int = 0, default_iterations: int = 1) -> None:
     shmem.acquire()
     try:
         layer = MegaMoeExperts(
-            local_num_tokens=args.tokens, hidden_size=args.hidden_size, intermediate_size=args.intermediate_size,
+            hidden_size=args.hidden_size, intermediate_size=args.intermediate_size,
             num_experts=args.experts, top_k=args.top_k, ep_size=world, ep_group=dist.group.WORLD,
             dispatch_mode=args.dispatch_mode,
         ).to(device=device, dtype=torch.bfloat16)

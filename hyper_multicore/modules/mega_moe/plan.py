@@ -142,6 +142,7 @@ def _build_runtime_artifacts(spec: MegaMoeSpec) -> tuple[Any, Any, Any, Any]:
         intermediate_size=spec.intermediate_size,
         num_cube_cores=spec.num_cube_cores,
         swiglu_limit=spec.swiglu_limit,
+        expert_weight_layout=spec.expert_weight_layout,
     )
     forward_graph.propagate_splits(task_values)
     attach_mega_moe_l1_view_resolvers(forward_graph)
@@ -160,6 +161,7 @@ def _build_runtime_artifacts(spec: MegaMoeSpec) -> tuple[Any, Any, Any, Any]:
         intermediate_size=spec.intermediate_size,
         num_cube_cores=spec.num_cube_cores,
         swiglu_limit=spec.swiglu_limit,
+        expert_weight_layout=spec.expert_weight_layout,
     )
     backward_graph.propagate_splits(task_values)
     attach_mega_moe_l1_view_resolvers(backward_graph)
@@ -251,11 +253,13 @@ def build_mega_moe_plan(spec: MegaMoeSpec, device: Any) -> MegaMoePlan:
             device,
         ),
         w1_grad_tiling=_tensor_from_bytes(
-            get_w1_grad_tiling_bytes(backward_graph.get_op("w1_grad").split_value, **gmm_options),
+            get_w1_grad_tiling_bytes(backward_graph.get_op("w1_grad").split_value,
+                                    expert_weight_layout=spec.expert_weight_layout, **gmm_options),
             device,
         ),
         w2_grad_tiling=_tensor_from_bytes(
-            get_w2_grad_tiling_bytes(backward_graph.get_op("w2_grad").split_value, **gmm_options),
+            get_w2_grad_tiling_bytes(backward_graph.get_op("w2_grad").split_value,
+                                    expert_weight_layout=spec.expert_weight_layout, **gmm_options),
             device,
         ),
         swiglu_grad_tiling=_tensor_from_bytes(

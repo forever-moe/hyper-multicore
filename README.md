@@ -35,13 +35,14 @@ torchrun --standalone --nproc-per-node=2 mega_moe_minimal.py --dispatch-mode pus
 ```
 
 使用 `--dispatch-mode pull` 可切换为 pull 分发。示例执行前向与反向计算，
-并输出形状、native 构建身份及耗时。[计时示例](examples/mega_moe_benchmark.py)支持更大形状、
-预热和重复采样；在源码目录外运行时，需将 `mega_moe_minimal.py` 一同复制。
+并输出形状、native 构建身份及耗时。通过 `--warmup` 和 `--iterations` 可增加采样次数。
+完整网络接入与训练对照见 [examples 指南](examples/README.md)，包括
+[MoE](examples/moe/README.md) 和 [MHC](examples/mhc/README.md)。
 
 应用程序可直接导入公共组件：
 
 ```python
-from hyper_multicore import MegaMoeExperts, MegaGate, HyperMegaMhc
+from hyper_multicore import MegaMoeExperts, MegaGate, MegaMhc
 from hyper_multicore.diagnostics import MegaKernelDiagnostics
 ```
 

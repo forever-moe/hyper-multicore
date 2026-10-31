@@ -52,6 +52,13 @@ class MegaMoeSpec:
     swiglu_limit: float | None = None
     max_local_num_tokens: int | None = None
     schedule_tokens: int | None = None
+    expert_weight_layout: str = "EIO"
+    auto_tokens: bool = False
+
+    @property
+    def dynamic_tokens(self) -> bool:
+        """Report variable-length execution with automatic or bounded storage."""
+        return self.auto_tokens or self.max_local_num_tokens is not None
 
     @property
     def plan_tokens(self) -> int:
@@ -156,6 +163,8 @@ def bind_mega_moe_spec(
     ep_group = specification["ep_group"]
     ep_size = specification["ep_size"]
     if dist.is_initialized():
+        if ep_group is None and dist.get_world_size() > 1:
+            raise ValueError("Pass ep_group explicitly for distributed MegaMoeExperts")
         group_size = dist.get_world_size(ep_group)
         rank_id = dist.get_rank(ep_group)
     else:
@@ -204,8 +213,10 @@ def bind_mega_moe_spec(
         num_cube_cores=num_cube_cores,
         swiglu_limit=swiglu_limit,
         dispatch_mode=specification.get("dispatch_mode", "push"),
+        expert_weight_layout=specification.get("expert_weight_layout", "EIO"),
         capacity_growth_factor=specification.get("capacity_growth_factor", _DEFAULT_CAPACITY_FACTOR),
         dispatch_split=specification.get("dispatch_split", _COMMUNICATION_SPLIT),
         combine_split=specification.get("combine_split", _COMMUNICATION_SPLIT),
         max_local_num_tokens=specification.get("max_local_num_tokens"),
+        auto_tokens=specification.get("auto_tokens", False),
     )

@@ -40,14 +40,14 @@ torchrun --standalone --nproc-per-node=2 mega_moe_minimal.py --dispatch-mode pus
 
 Use `--dispatch-mode pull` for pull dispatch. The example runs forward and
 backward and prints its shape, native build identity and elapsed time.
-The [benchmark example](examples/mega_moe_benchmark.py) supports larger shapes,
-warmup and repeated timing; copy `mega_moe_minimal.py` alongside it when running
-outside the checkout.
+Use `--warmup` and `--iterations` to increase sampling. The [examples guide](examples/README.md)
+provides complete [MoE](examples/moe/README.md) and [MHC](examples/mhc/README.md)
+network integration and training comparisons.
 
 Applications import the public components directly:
 
 ```python
-from hyper_multicore import MegaMoeExperts, MegaGate, HyperMegaMhc
+from hyper_multicore import MegaMoeExperts, MegaGate, MegaMhc
 from hyper_multicore.diagnostics import MegaKernelDiagnostics
 ```
 
