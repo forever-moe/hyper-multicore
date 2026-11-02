@@ -23,16 +23,16 @@ import json
 import os
 from pathlib import Path
 import platform
+import runpy
 import subprocess
 import sys
 
 from packaging.version import Version
 
 COMPONENT_VERSION = "0.1.0.dev0"
+_MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[1] / "_native_manifest.py"))
 REQUIRED_LIBRARIES = (
-    "lib/framework/torch/libhyper_multicore_torch.so",
     "lib/vendors/hyper_multicore_nn/op_api/lib/libcust_opapi.so",
-    "shmem/lib/framework/torch/hyper_multicore_shmem_torch.so",
     "shmem/lib/libhyper_multicore_shmem_ops.so",
     "shmem/lib/shmem/libhyper_multicore_shmem.so",
     "shmem/lib/shmem/libhyper_multicore_shmem_utils.so",
@@ -72,13 +72,15 @@ def _source_identity(root: Path) -> dict:
     inputs = {}
     for directory in ("hyper_multicore", "scripts"):
         for path in sorted((root / directory).rglob("*")):
-            if path.is_file() and path.suffix in {".py", ".cpp", ".cc", ".h", ".hpp", ".sh", ".bash",
-                                                ".patch", ".json", ".ini", ".cmake", ".txt"}:
+            if path.is_file() and (path.name == "hyper_multicore_build_info" or path.suffix in {".py", ".cpp", ".cc", ".h", ".hpp", ".sh", ".bash",
+                                                ".patch", ".json", ".ini", ".cmake", ".txt"}):
                 if any(part in {"lib", "__pycache__"} for part in path.relative_to(root).parts):
                     continue
                 inputs[path.relative_to(root).as_posix()] = _sha256(path)
     for name in ("setup.py", "MANIFEST.in", "build.sh", "requirements.txt"):
         inputs[name] = _sha256(root / name)
+    native_test = root / "tests/ut/shmem/native_log_test.cpp"
+    inputs["tests/ut/shmem/native_log_test.cpp"] = _sha256(native_test) if native_test.is_file() else None
     build_commit = None
     if (root / ".git").exists():
         result = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=False, capture_output=True)
@@ -121,6 +123,7 @@ def build_identity(root: Path, soc_list: str) -> dict:
     info = {
         "schema_version": 1, "component_version": COMPONENT_VERSION, "artifact_version": version,
         "pta_version": pta_version, "torch_version": metadata.version("torch"),
+        "op_plugin_version": f"V{Version(metadata.version('torch')).major}R{Version(metadata.version('torch')).minor}",
         "torch_commit": getattr(torch.version, "git_version", None),
         "torch_cxx11_abi": bool(torch._C._GLIBCXX_USE_CXX11_ABI),
         "python_abi": f"cp{sys.version_info.major}{sys.version_info.minor}",
@@ -132,6 +135,17 @@ def build_identity(root: Path, soc_list: str) -> dict:
         "dependency_lock_sha256": _sha256(root / "hyper_multicore/_build/dependencies.lock.json"),
         **_source_identity(root),
     }
+    for name, directory in (("torch_headers_sha256", Path(torch.__file__).resolve().parent / "include"),
+                            ("pta_headers_sha256", pta_root / "include")):
+        digest = hashlib.sha256()
+        for header in sorted(directory.rglob("*")):
+            if header.is_file():
+                digest.update(header.relative_to(directory).as_posix().encode())
+                digest.update(bytes.fromhex(_sha256(header)))
+        info[name] = digest.hexdigest()
+    info["torch_libraries_sha256"] = {
+        name: _sha256(Path(torch.__file__).resolve().parent / "lib" / name)
+        for name in ("libc10.so", "libtorch.so", "libtorch_cpu.so")}
     info["build_fingerprint"] = hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()
     return info
 
@@ -221,24 +235,26 @@ def validate_payload(root: Path, info: dict) -> None:
     Raises:
         RuntimeError: If identity, required files or native checksums are invalid.
     """
-    if info["artifact_version"] != artifact_version(info["pta_version"]):
-        raise RuntimeError("Payload version does not match its PTA identity")
     for relative in (*REQUIRED_LIBRARIES, "lib/set_env.bash"):
         path = root / relative
         if not path.is_file() or path.stat().st_size == 0:
             raise RuntimeError(f"Missing native payload file: {relative}")
-    adapters = sorted(path.name for path in (root / "lib/framework/torch").glob("*.so"))
-    if adapters != ["libhyper_multicore_torch.so"]:
-        raise RuntimeError(f"Expected only the shared Torch adapter, found: {adapters}")
-    hashes = info.get("native_sha256", {})
-    for path in root.rglob("*.so"):
-        relative = path.relative_to(root).as_posix()
-        if hashes.get(relative) != _sha256(path):
-            raise RuntimeError(f"Unrecorded or changed native library: {relative}")
-    for relative in REQUIRED_LIBRARIES:
-        if relative not in hashes:
-            raise RuntimeError(f"Missing native checksum: {relative}")
+    if (root / "lib/framework").exists() or (root / "shmem/lib/framework").exists():
+        raise RuntimeError("Expected only the shared Torch adapter in each variant; stale framework layout")
     _validate_vendor_resources(root, info.get("soc_list"), info.get("host_arch"))
+    try:
+        manifest = _MANIFEST["read_manifest"](root)
+        _MANIFEST["check_integrity"](root, info, manifest)
+    except (OSError, ValueError, KeyError) as error:
+        raise RuntimeError(str(error)) from error
+    expected_version = (COMPONENT_VERSION if info.get("build_mode") == "all"
+                        else artifact_version(info["variants"][0]["pta_version"]))
+    if info["artifact_version"] != expected_version:
+        raise RuntimeError("Payload version does not match its framework matrix")
+    if info.get("build_mode") not in ("current", "all"):
+        raise RuntimeError("Unknown payload build mode")
+    if info["build_mode"] == "current" and len(manifest["variants"]) != 1:
+        raise RuntimeError("Current-environment payload must contain one adapter pair")
     recorded = info.get("payload_sha256")
     if not isinstance(recorded, dict) or not recorded:
         raise RuntimeError("Missing complete payload checksum manifest: payload_sha256")

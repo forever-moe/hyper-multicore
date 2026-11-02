@@ -32,7 +32,8 @@ LOADER = runpy.run_path(str(Path(__file__).absolute().parents[2] / "hyper_multic
 
 def _payload_fixture(root, socs=("ascend910b",)):
     """Create a complete synthetic runtime layout without loading native code."""
-    resources = [*HELPER["REQUIRED_LIBRARIES"], "lib/set_env.bash", "lib/vendors/hyper_multicore_nn/version.info",
+    resources = [*HELPER["REQUIRED_LIBRARIES"], "adapters/manifest.json",
+                 "adapters/fixture/libhyper_multicore_torch.so", "adapters/fixture/hyper_multicore_shmem_torch.so", "lib/set_env.bash", "lib/vendors/hyper_multicore_nn/version.info",
                  "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/liboptiling.so",
                  "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/lib/linux/aarch64/libcust_opmaster_rt2.0.so",
                  "lib/vendors/hyper_multicore_nn/op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so"]
@@ -61,10 +62,17 @@ def _payload_fixture(root, socs=("ascend910b",)):
         path.write_bytes(b"{}" if path.suffix == ".json" else b"fixture")
     for relative, contents in indexes.items():
         (root / relative).write_text(json.dumps(contents), encoding="utf-8")
+    variant = {"id": "fixture", "torch_release": "2.12.0", "pta_release": "2.12.0", "torch_version": "2.12.0+cpu",
+               "pta_version": "2.12.0", "torch_cxx11_abi": True, "torch_so": "adapters/fixture/libhyper_multicore_torch.so",
+               "shmem_so": "adapters/fixture/hyper_multicore_shmem_torch.so"}
+    (root / "adapters/manifest.json").write_text(json.dumps({"schema_version": 1, "python_abi": "cp310",
+                                                            "host_arch": "aarch64", "variants": [variant]}))
     hashes = {relative: hashlib.sha256((root / relative).read_bytes()).hexdigest() for relative in resources}
-    return {"pta_version": "2.12.0", "artifact_version": "0.1.0.dev0+pt.2.12.0", "soc_list": list(socs), "host_arch": "aarch64",
+    return {"schema_version": 2, "build_mode": "current", "variants": [variant], "requested_target_ids": ["fixture"], "python_abi": "cp310",
+            "pta_version": "2.12.0", "artifact_version": "0.1.0.dev0+pt.2.12.0", "soc_list": list(socs), "host_arch": "aarch64",
             "native_sha256": {name: digest for name, digest in hashes.items() if name.endswith(".so")},
             "payload_sha256": hashes}
+
 
 
 class TestArtifacts(unittest.TestCase):
@@ -95,6 +103,7 @@ class TestArtifacts(unittest.TestCase):
             source = (root / "hyper_multicore/_build/artifacts.py").read_text()
             version_line = 'COMPONENT_VERSION = "' + HELPER["COMPONENT_VERSION"] + '"'
             self.assertIn(version_line, source)
+            (project / "hyper_multicore/_native_manifest.py").write_text((root / "hyper_multicore/_native_manifest.py").read_text())
             helper.write_text(source.replace(version_line, 'COMPONENT_VERSION = "7.8.9.dev0"'), encoding="utf-8")
             payload = project / "payload"
             payload.mkdir()
@@ -139,6 +148,7 @@ class TestArtifacts(unittest.TestCase):
             info = _payload_fixture(root)
             HELPER["validate_payload"](root, info)
             extra = root / "lib/framework/torch/stale_adapter.so"
+            extra.parent.mkdir(parents=True, exist_ok=True)
             extra.write_bytes(b"fixture")
             info["native_sha256"][extra.relative_to(root).as_posix()] = hashlib.sha256(extra.read_bytes()).hexdigest()
             with self.assertRaisesRegex(RuntimeError, "Expected only the shared Torch adapter"):
@@ -272,37 +282,45 @@ class TestArtifacts(unittest.TestCase):
             self.assertIsNone(identity["build_commit"])
             self.assertEqual(len(identity["source_sha256"]), 64)
 
-    def test_native_environment_mismatch_is_rejected(self):
-        """Wrong Torch, PTA, Python, ABI or custom PTA binary must fail before loading."""
+    def test_native_ctest_source_changes_frozen_build_identity(self):
+        """The compiled CTest input must be included even though it lives outside the package."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "lib").mkdir()
-            (root / "lib/libtorch_npu.so").write_bytes(b"mock PTA binary")
-            (root / "opp").mkdir()
-            (root / "opp/version.info").write_bytes(b"mock CANN version")
-            actual = {
-                "torch_version": "2.9.0", "pta_version": "2.9.0.post4",
-                "python_abi": f"cp{sys.version_info.major}{sys.version_info.minor}",
-                "host_arch": LOADER["platform"].machine(), "torch_cxx11_abi": True, "torch_commit": "mock",
-                "libtorch_npu_sha256": hashlib.sha256(b"mock PTA binary").hexdigest(),
-                "cann_version_sha256": hashlib.sha256(b"mock CANN version").hexdigest(),
-            }
+            for name in ("setup.py", "MANIFEST.in", "build.sh", "requirements.txt"):
+                (root / name).write_text("fixture")
+            native_test = root / "tests/ut/shmem/native_log_test.cpp"
+            native_test.parent.mkdir(parents=True)
+            before = HELPER["_source_identity"](root)
+            native_test.write_text("first CTest source")
+            present = HELPER["_source_identity"](root)
+            native_test.write_text("changed CTest source")
+            changed = HELPER["_source_identity"](root)
+            self.assertNotEqual(before["source_sha256"], present["source_sha256"])
+            self.assertNotEqual(present["source_sha256"], changed["source_sha256"])
+
+    def test_native_environment_selects_branch_and_rejects_abi_mismatches(self):
+        """External post/CANN/hash differences are diagnostic; branch and ABI boundaries remain."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            info = _payload_fixture(root)
+            (root / "build_info.json").write_text(json.dumps(info))
+            actual = {"torch_version": "2.12.0+cpu", "pta_version": "2.12.0", "python_abi": "cp310",
+                      "host_arch": "aarch64", "torch_cxx11_abi": True, "cann_version": "9.2.0"}
             validate = LOADER["validate_native_compatibility"]
-            with patch.dict(validate.__globals__, {"_component_root": lambda: root / "lib"}), patch.object(
-                metadata, "version", side_effect=lambda name: actual["torch_version" if name == "torch"
-                                                                      else "pta_version"]
-            ), patch.object(LOADER["util"], "find_spec", return_value=SimpleNamespace(origin=str(root / "__init__.py"))), \
-                    patch.dict(sys.modules, {"torch": SimpleNamespace(
-                        _C=SimpleNamespace(_GLIBCXX_USE_CXX11_ABI=True), version=SimpleNamespace(git_version="mock"))}), \
-                    patch.dict(LOADER["os"].environ, {"ASCEND_HOME_PATH": str(root)}):
-                (root / "build_info.json").write_text(json.dumps(actual), encoding="utf-8")
-                validate()
-                for key in actual:
-                    changed = dict(actual)
-                    changed[key] = "incompatible"
-                    (root / "build_info.json").write_text(json.dumps(changed), encoding="utf-8")
-                    with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                        validate()
+            for key, value in (("pta_version", "2.12.0.post99"), ("cann_version", "unknown"),
+                               ("cann_version", "9.1.0"), ("libtorch_npu_sha256", "other"), ("torch_commit", "other")):
+                with self.subTest(allowed=key), patch.dict(validate.__globals__, {
+                    "_component_root": lambda: root / "lib", "_selection": None,
+                    "_runtime_identity": lambda: {**actual, key: value},
+                }):
+                    self.assertEqual(validate()["variant"]["id"], "fixture")
+            for key, value in (("pta_version", "2.9.0"), ("torch_version", "2.9.0"),
+                               ("python_abi", "cp311"), ("host_arch", "x86_64"), ("torch_cxx11_abi", False)):
+                with self.subTest(rejected=key), patch.dict(validate.__globals__, {
+                    "_component_root": lambda: root / "lib", "_selection": None,
+                    "_runtime_identity": lambda: {**actual, key: value},
+                }), self.assertRaisesRegex(RuntimeError, "ABI-MISMATCH"):
+                    validate()
 
 
 if __name__ == "__main__":
