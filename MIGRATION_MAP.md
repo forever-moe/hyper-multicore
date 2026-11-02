@@ -62,7 +62,7 @@
 | Python 导入 | `hyper_parallel.core.multicore` → `hyper_multicore`。同步 #1256 后公共 MHC 类名为 `MegaMhc`，MoE 自动推导 token 容量，不再接收 `local_num_tokens` / `max_local_num_tokens` 构造参数；本仓不提供 `hyper_parallel` 兼容包，也不依赖原仓运行或构建 |
 | C++ 命名空间 | 原 `hyper_parallel::multicore::...` → `hyper_multicore::...`，同步迁移 namespace、using 和限定名；例如 SHMEM runtime 的头文件与实现 |
 | Torch dispatcher | `torch.ops.hyper_parallel.*` → `torch.ops.hyper_multicore.*`，C++ 的注册命名空间对应调整；同名算子的 schema 保持兼容 |
-| Torch SO 与加载 | 原 `libhyper_parallel_mega_moe_torch.so`、`libhyper_parallel_mega_gate_torch.so`，以及新仓曾使用的两个组件 SO，均由单个 `libhyper_multicore_torch.so` 承接；目标为 `hyper_multicore_torch`，安装于包的 `lib/framework/torch/` |
+| Torch SO 与加载 | 原 `libhyper_parallel_mega_moe_torch.so`、`libhyper_parallel_mega_gate_torch.so`，以及新仓曾使用的两个组件 SO，均由单个 `libhyper_multicore_torch.so` 承接；目标为 `hyper_multicore_torch`；每个框架适配对安装于 `adapters/<variant-id>/`，由包内清单统一选择 Torch SO 和 SHMEM binding，不恢复固定路径或分组件库 |
 | Python 算子包装 | 三类组件都经 `N/torch/ops.py` 延迟加载；保留 `_loader.py` 的环境、ABI 校验、vendor 预加载，以及 transport/梯度 alias 检查。新增注册源加入统一 CMake 目标，不恢复 `mega_gate_ops.py` |
 | Vendor 与 SHMEM 名称 | vendor 为 `hyper_multicore_nn`；私有库使用 `hyper_multicore` 项目名。具体制品路径以 `N/_build/artifacts.py` 为准；ACLNN/`HyperMega*` 算子名、上游 CANN/SHMEM 符号和 bootstrap 名称保留 |
 | SHMEM 用户配置 | 原 `HYPER_PARALLEL_SHMEM_*` 对应 `HYPER_MULTICORE_SHMEM_*` 的 `HEAP_SIZE`、`TIMEOUT_SEC`、`DATA_ENGINE`、`BOOTSTRAP_ENDPOINT` 四项；旧前缀不作兼容读取 |

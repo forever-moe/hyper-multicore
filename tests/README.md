@@ -52,7 +52,8 @@ C++ runtime ABI reader 检查需要支持 C++17 的 G++。部分用例读取仓�
 
 ### NPU 系统测试
 
-需要 Linux、与制品匹配的 Python/Torch/PTA/CANN 环境、pytest，以及已构建的 native payload。
+需要 Linux、匹配制品标签的 Python/CPU 架构与 Torch/PTA 分支、彼此兼容的 CANN/驱动、pytest，以及已构建的 native payload。
+使用 `hyper_multicore_build_info` 查看安装包构建矩阵；构建 PTA post 和 CANN 版本不作为运行时版本门禁。
 安装和构建步骤见[构建与安装指南](../docs/build.md)。
 
 先激活 CANN，然后选择一种运行方式：
@@ -243,3 +244,11 @@ export HP_MEGA_MOE_EVIDENCE_DIR="$PWD/logs/moe-results"
 
 判断通过应同时检查 pytest 结果和所需 worker/rank 是否完整执行。skip、超时、进程崩溃或
 缺失结果都不算通过；计时 smoke 通过只说明其断言满足，不代表性能达到某个发布门槛。
+
+## 多框架制品回归
+
+全量 wheel 在框架锁登记的每组环境分别安装同一个文件并核对 SHA256。
+每组 CPU 从源码根目录运行完整 `tests/ut`；NPU 按上文复制完整 `tests/` 到源码外，使用安装态制品串行运行完整 `tests/torch`。
+记录实际 collect、退出码、JUnit 和 worker 日志，不用历史数量代替本次结果。
+默认单分支 wheel 另在实际构建环境完整回归，确认默认入口和功能保持可用。
+验证环境差异和结果分别记录；构建矩阵中的条目不自动代表该制品已完成运行验收。
