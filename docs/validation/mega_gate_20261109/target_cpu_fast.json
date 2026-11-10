@@ -1,0 +1,23 @@
+{
+  "_mega_gate_projection(4096, 5120)": {
+    "count": 100,
+    "total_us": 8619.119999999999,
+    "median_us": 86.77
+  },
+  "_mega_gate_sigmoid_route_grad(4096, 384)": {
+    "count": 100,
+    "total_us": 4151.840000000001,
+    "median_us": 41.805
+  },
+  "_mega_gate_projection_mm(384, 4096)": {
+    "count": 100,
+    "total_us": 1953.3999999999994,
+    "median_us": 19.46
+  },
+  "_mega_gate_projection_mm(4096, 384)": {
+    "count": 100,
+    "total_us": 1262.66,
+    "median_us": 12.51
+  },
+  "whole_host_ms_per_iteration": 2.2732519999954093
+}

@@ -283,6 +283,7 @@ class TestMegaKernelProfileLayout(unittest.TestCase):
                     return object()
 
                 with (
+                    patch("hyper_multicore.modules.mega_gate.plan.torch.npu", create=True) as npu,
                     patch(
                         "hyper_multicore.modules.mega_gate.plan.dist.is_initialized",
                         return_value=initialized,
@@ -300,6 +301,7 @@ class TestMegaKernelProfileLayout(unittest.TestCase):
                         return_value=object(),
                     ),
                 ):
+                    npu.get_device_limit.return_value = {"vector_core_num": 64}
                     build_mega_gate_plan(SimpleNamespace(type="npu", index=0))
 
                 self.assertEqual(prepared_ranks, [expected_rank] * 3)

@@ -32,6 +32,10 @@ const aclTensor *HyperMegaGateSqrtInputGrad(const aclTensor *score_grad, const a
 const aclTensor *HyperMegaGateSoftplusV2Grad(const aclTensor *sqrt_input_grad, const aclTensor *logits,
                                              const aclTensor *output, aclOpExecutor *executor);
 
+/** Apply the production SigmoidGrad in its original multiplication order. */
+const aclTensor *HyperMegaGateSigmoidGrad(const aclTensor *score_grad, const aclTensor *route_scores,
+                                         const aclTensor *output, aclOpExecutor *executor);
+
 }  // namespace l0op
 
 #endif  // L0OP_HYPER_MEGA_GATE_ROUTE_GRAD_POST_H

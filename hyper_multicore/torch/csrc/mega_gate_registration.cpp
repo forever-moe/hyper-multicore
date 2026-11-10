@@ -39,4 +39,19 @@ TORCH_LIBRARY_FRAGMENT(hyper_multicore, m) {
     "int top_k, "
     "float routed_scaling_factor"
     ") -> Tensor");
+  m.def(
+    "mega_gate_sigmoid_route(Tensor logits, Tensor bias, Tensor image_mask, Tensor runtime_config, "
+    "Tensor diagnostic_buffer, int top_k, bool normalize, bool use_bias=True) "
+    "-> (Tensor, Tensor, Tensor, Tensor, Tensor)");
+  m.def(
+    "mega_gate_sigmoid_route_grad(Tensor logits, Tensor route_scores, Tensor selected_scores, "
+    "Tensor normalization_denominator, Tensor expert_indices, Tensor grad_routing_weights, Tensor runtime_config, "
+    "Tensor diagnostic_buffer, int top_k, bool normalize) -> Tensor");
+
+  m.def(
+    "mega_gate_sigmoid_route_out(Tensor logits, Tensor bias, Tensor image_mask, Tensor runtime_config, "
+    "Tensor diagnostic_buffer, Tensor(a!) weights, Tensor(b!) indices, Tensor(c!) scores, "
+    "Tensor(d!) selected, Tensor(e!) denominator, int top_k, bool normalize, bool use_bias=True) "
+    "-> (Tensor(a!), Tensor(b!), Tensor(c!), Tensor(d!), Tensor(e!))");
+
 }

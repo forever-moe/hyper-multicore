@@ -48,23 +48,22 @@ bool AreOutputsValid(const aclTensor *routing_weights, const aclTensor *expert_i
          HasShape(normalization_denominator, tokens, 1) && IsFp32(normalization_denominator);
 }
 
+bool IsSupportedNormalization(bool use_sigmoid, bool normalize, int64_t top_k) {
+  return !use_sigmoid || !normalize || top_k <= 8 || top_k == 16 || top_k == 128 || top_k == 384;
+}
+
 }  // namespace
 
-extern "C" {
-
-aclnnStatus aclnnHyperMegaGateRouteGetWorkspaceSize(const aclTensor *logits, const aclTensor *text_bias,
+static aclnnStatus PrepareRoute(const aclTensor *logits, const aclTensor *text_bias,
                                                     const aclTensor *vision_bias, const aclTensor *image_mask,
                                                     const aclTensor *runtime_config, const aclTensor *diagnostic_buffer,
                                                     const aclTensor *routing_weights, const aclTensor *expert_indices,
                                                     const aclTensor *route_scores, const aclTensor *selected_scores,
                                                     const aclTensor *normalization_denominator, int64_t top_k,
                                                     double routed_scaling_factor, bool use_vision_bias,
-                                                    uint64_t *workspaceSize, aclOpExecutor **executor) {
+                                                    uint64_t *workspaceSize, aclOpExecutor **executor,
+                                                    bool use_sigmoid, bool normalize, bool use_bias = true) {
   OP_CHECK_COMM_INPUT(workspaceSize, executor);
-  L2_DFX_PHASE_1(aclnnHyperMegaGateRoute,
-                 DFX_IN(logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer, top_k,
-                        routed_scaling_factor, use_vision_bias),
-                 DFX_OUT(routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator));
   CHECK_RET(logits != nullptr && logits->GetViewShape().GetDimNum() == 2, ACLNN_ERR_PARAM_INVALID);
   const int64_t tokens = logits->GetViewShape().GetDim(0);
   const int64_t expert_count = logits->GetViewShape().GetDim(1);
@@ -76,18 +75,79 @@ aclnnStatus aclnnHyperMegaGateRouteGetWorkspaceSize(const aclTensor *logits, con
                               tokens, expert_count, top_k),
             ACLNN_ERR_PARAM_INVALID);
 
+  CHECK_RET(IsSupportedNormalization(use_sigmoid, normalize, top_k),
+            ACLNN_ERR_PARAM_INVALID);
   auto unique_executor = CREATE_EXECUTOR();
   auto *executor_ptr = unique_executor.get();
   CHECK_RET(executor_ptr != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
   const auto outputs =
     l0op::HyperMegaGateRoute(logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer,
                              routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator,
-                             top_k, static_cast<float>(routed_scaling_factor), use_vision_bias, executor_ptr);
+                             top_k, static_cast<float>(routed_scaling_factor), use_vision_bias,
+                             executor_ptr, use_sigmoid, normalize, use_bias);
   CHECK_RET(std::all_of(outputs.begin(), outputs.end(), [](const aclTensor *output) { return output != nullptr; }),
             ACLNN_ERR_INNER_NULLPTR);
   *workspaceSize = unique_executor->GetWorkspaceSize();
   unique_executor.ReleaseTo(executor);
   return ACLNN_SUCCESS;
+}
+
+extern "C" {
+
+aclnnStatus aclnnHyperMegaGateRouteGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *text_bias, const aclTensor *vision_bias, const aclTensor *image_mask,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
+  const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, int64_t top_k, double routed_scaling_factor, bool use_vision_bias,
+  uint64_t *workspaceSize, aclOpExecutor **executor) {
+  L2_DFX_PHASE_1(aclnnHyperMegaGateRoute,
+                 DFX_IN(logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer, top_k,
+                        routed_scaling_factor, use_vision_bias),
+                 DFX_OUT(routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator));
+  return PrepareRoute(logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer, routing_weights,
+                      expert_indices, route_scores, selected_scores, normalization_denominator, top_k,
+                      routed_scaling_factor, use_vision_bias, workspaceSize, executor, false, true);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRouteGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *bias, const aclTensor *image_mask,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
+  const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, int64_t top_k, bool normalize,
+  uint64_t *workspaceSize, aclOpExecutor **executor) {
+  L2_DFX_PHASE_1(aclnnHyperMegaGateSigmoidRoute,
+                 DFX_IN(logits, bias, image_mask, runtime_config, diagnostic_buffer, top_k, normalize),
+                 DFX_OUT(routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator));
+  return PrepareRoute(logits, bias, bias, image_mask, runtime_config, diagnostic_buffer, routing_weights,
+                      expert_indices, route_scores, selected_scores, normalization_denominator, top_k,
+                      1.0, false, workspaceSize, executor, true, normalize, true);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRouteV2GetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *bias, const aclTensor *image_mask,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
+  const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, int64_t top_k, bool normalize, bool use_bias,
+  uint64_t *workspaceSize, aclOpExecutor **executor) {
+  L2_DFX_PHASE_1(aclnnHyperMegaGateSigmoidRouteV2,
+                 DFX_IN(logits, bias, image_mask, runtime_config, diagnostic_buffer, top_k,
+                        normalize, use_bias),
+                 DFX_OUT(routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator));
+  return PrepareRoute(logits, bias, bias, image_mask, runtime_config, diagnostic_buffer, routing_weights,
+                      expert_indices, route_scores, selected_scores, normalization_denominator, top_k,
+                      1.0, false, workspaceSize, executor, true, normalize, use_bias);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRoute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                         aclrtStream stream) {
+  L2_DFX_PHASE_2(aclnnHyperMegaGateSigmoidRoute);
+  return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRouteV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                           aclrtStream stream) {
+  L2_DFX_PHASE_2(aclnnHyperMegaGateSigmoidRouteV2);
+  return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
 aclnnStatus aclnnHyperMegaGateRoute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,

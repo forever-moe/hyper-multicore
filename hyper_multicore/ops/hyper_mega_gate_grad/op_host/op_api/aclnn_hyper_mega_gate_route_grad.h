@@ -48,6 +48,18 @@ ACLNN_API aclnnStatus aclnnHyperMegaGateRouteGradGetWorkspaceSize(
 ACLNN_API aclnnStatus aclnnHyperMegaGateRouteGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                                   aclrtStream stream);
 
+/** Prepare sigmoid logits gradients from unscaled routing-weight gradients.
+ * normalize must match forward; K=1 always uses the direct gradient branch.
+ * Normalized sigmoid routing supports K=1..8, 16, 128 and 384.
+ */
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRouteGradGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *grad_logits, int64_t top_k,
+  bool normalize, uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRouteGrad(
+  void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,0 +1,8 @@
+{
+  "side": "source",
+  "device": "Ascend950PR_9589",
+  "torch": "2.12.0+cpu",
+  "torch_npu": "2.12.0.post3",
+  "timings": {},
+  "fixture_sha256": "f55b953d9ad15edfe344bc8528ecd27a6efae2e10cb89ef26ee971179e09ebba"
+}

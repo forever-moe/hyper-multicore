@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "regression_limit": 0.02,
+  "processes_per_side": 6,
+  "results": {
+    "T4096/route/forward": {
+      "source_ms": 0.8636260732014974,
+      "target_ms": 0.8645996220906575,
+      "change": 0.0011272805666358021,
+      "confidence95": [
+        -0.000617200089740047,
+        0.003481717241497578
+      ],
+      "status": "pass"
+    },
+    "T4096/route/training": {
+      "source_ms": 2.458143361409505,
+      "target_ms": 2.457348887125651,
+      "change": -0.00032320095578108887,
+      "confidence95": [
+        -0.0007407812346935438,
+        0.0003037260823994636
+      ],
+      "status": "pass"
+    },
+    "T4096/route/checkpoint": {
+      "source_ms": 3.3256789143880208,
+      "target_ms": 3.326485595703125,
+      "change": 0.00024256139449119196,
+      "confidence95": [
+        -0.00031094965846873985,
+        0.01785402720168014
+      ],
+      "status": "pass"
+    }
+  }
+}

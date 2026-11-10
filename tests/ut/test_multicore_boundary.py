@@ -212,17 +212,17 @@ assert load_torch_npu.cache_info().currsize == 0
 
     @arg_mark(plat_marks=["cpu_linux", "cpu_macos"], level_mark="level0",
               card_mark="allcards", essential_mark="essential")
-    def test_native_mega_kernels_share_cached_op_api_bridge(self):
+    def test_native_common_bridge_delegates_to_framework(self):
         """Feature: Shared ACLNN bridge.
-        Description: Inspect the native delegation and existing operator call sites.
-        Expectation: Operators use one wrapper backed by the native V1/V2 macros.
+        Description: Inspect delegation for operators using the common bridge.
+        Expectation: The common wrapper delegates to the native V1/V2 macros.
         """
         csrc = Path(multicore.__file__).parent / "torch" / "csrc"
         header = (csrc / "cached_op_api.h").read_text(encoding="utf-8")
         for macro in ("EXEC_NPU_CMD_V1_EXT", "EXEC_NPU_CMD_V2_EXT"):
             self.assertIn(macro, header, msg=f"Expected native delegation={macro}, present={macro in header}")
         callers = (
-            "mega_gate.cpp", "mega_mhc.cpp", "mega_moe.cpp", "mega_moe_grad.cpp",
+            "mega_mhc.cpp", "mega_moe.cpp", "mega_moe_grad.cpp",
             "mega_moe_unpermute.cpp", "moe_token_permute_grad.cpp", "moe_token_permute_out.cpp",
         )
         for name in callers:

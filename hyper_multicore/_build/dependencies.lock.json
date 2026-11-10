@@ -67,6 +67,12 @@
             "path": "hyper_multicore/ops/mxfp8_quant/row_only_logical_worker.patch",
             "sha256": "7e7e3eaa1aeacfb26d0b48225d693beae1b939bd8cc3868f5dacf58acd8079ff",
             "purpose": "Expose logical worker index for the unchanged standard row-only SwiGLU primitive."
+          },
+          {
+            "path": "hyper_multicore/ops/patches/mega_gate_projection_owner.patch",
+            "sha256": "eb4e7c1817e1038d116679bce125dfe79f252fbe5029b579e8b79c8810e193e8",
+            "purpose": "allow tile-owned MegaGate projection to execute one complete matmul on its physical Cube, preserving default block scheduling",
+            "allow_zero_context": true
           }
         ],
         "upgrade_policy": "a version change must rebase the adapter and pass the full multicore kernel matrix"

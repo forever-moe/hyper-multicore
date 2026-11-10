@@ -5,6 +5,7 @@
  */
 
 #include "hyper_mega_gate_route_tiling.h"
+#include "route_tiling_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,27 +20,9 @@ namespace {
 
 using namespace AscendC;  // NOLINT(build/namespaces) TopKMode lives in AscendC
 
-constexpr uint32_t kAivWorkerSlotCapacity = 48;
 constexpr uint32_t kRouteStageCount = 10;
 constexpr uint32_t kExpertAlignment = 64;
 constexpr uint32_t kSelectedExpertAlignment = 8;
-constexpr uint32_t kMaximumBatchRows = 256;
-constexpr uint64_t kWorkspaceAlignment = 512;
-
-uint32_t CeilDiv(uint32_t value, uint32_t factor) { return value / factor + (value % factor != 0); }
-
-uint64_t AlignUp(uint64_t value, uint64_t alignment) { return (value + alignment - 1) / alignment * alignment; }
-
-struct RouteInputs {
-  uint32_t tokens;
-  uint32_t expert_count;
-  uint32_t top_k;
-  float scaling;
-  bool use_vision_bias;
-  uint64_t runtime_bytes;
-  uint64_t profile_bytes;
-};
-
 bool HasValidRanks(const gert::Shape &logits, const gert::Shape &text_bias, const gert::Shape &vision_bias,
                    const gert::Shape &image_mask, const gert::Shape &runtime, const gert::Shape &profile) {
   return logits.GetDimNum() == 2 && text_bias.GetDimNum() == 1 && vision_bias.GetDimNum() == 1 &&
@@ -106,76 +89,20 @@ ge::graphStatus ParseInputs(gert::TilingContext *context, RouteInputs &inputs) {
   inputs.tokens = static_cast<uint32_t>(logits.GetDim(0));
   inputs.expert_count = static_cast<uint32_t>(logits.GetDim(1));
   inputs.top_k = static_cast<uint32_t>(*top_k);
+  const auto *use_sigmoid = attrs->GetAttrPointer<bool>(3);
+  const auto *normalize = attrs->GetAttrPointer<bool>(4);
+  const auto *use_bias = attrs->GetAttrPointer<bool>(5);
+  OP_CHECK_NULL_WITH_CONTEXT(context, use_sigmoid);
+  OP_CHECK_NULL_WITH_CONTEXT(context, normalize);
+  OP_CHECK_NULL_WITH_CONTEXT(context, use_bias);
+  inputs.use_sigmoid = *use_sigmoid;
+  inputs.normalize = *normalize;
+  inputs.use_bias = *use_bias;
   inputs.scaling = *scaling;
   inputs.use_vision_bias = *use_vision_bias;
   inputs.runtime_bytes = static_cast<uint64_t>(runtime.GetDim(0));
   inputs.profile_bytes = static_cast<uint64_t>(profile.GetDim(0));
   return ge::GRAPH_SUCCESS;
-}
-
-bool SelectBatchRows(gert::TilingContext *context, platform_ascendc::PlatformAscendC &platform,
-                     const RouteInputs &inputs, uint32_t rows_per_worker, uint32_t e_align, uint32_t k_align,
-                     uint32_t available_workers, uint64_t ub_size, uint32_t &batch, uint32_t &shared_tmp) {
-  batch = std::min(rows_per_worker, kMaximumBatchRows);
-  uint32_t topk_tmp = 0;
-  while (batch > 0) {
-    uint32_t sum_tmp_max = 0;
-    if (inputs.top_k > 1) {
-      uint32_t sum_tmp_min = 0;
-      GetSumMaxMinTmpSize(inputs.top_k, sizeof(float), false, sum_tmp_max, sum_tmp_min);
-    }
-    uint32_t candidate_topk_tmp = 0;
-    uint32_t candidate_topk_tmp_min = 0;
-    if (!GetTopKMaxMinTmpSize(platform, e_align, batch, false, true, TopKMode::TOPK_NORMAL, true, sizeof(float),
-                              candidate_topk_tmp, candidate_topk_tmp_min)) {
-      if (batch == 1) {
-        OP_LOGE(context->GetNodeName(),
-                "GetTopKMaxMinTmpSize failed: tokens=%u experts=%ld topK=%ld batchRows=%u "
-                "availableAivWorkers=%u.",
-                inputs.tokens, static_cast<int64_t>(inputs.expert_count), static_cast<int64_t>(inputs.top_k), batch,
-                available_workers);
-        return false;
-      }
-      batch = std::max(1u, batch / 2);
-      continue;
-    }
-    topk_tmp = candidate_topk_tmp;
-    uint32_t bcast_tmp_max = 0;
-    uint32_t bias_bcast_tmp = 0;
-    uint32_t row_bcast_tmp = 0;
-    uint32_t mask_bcast_tmp = 0;
-    (void)GetBroadCastMaxMinTmpSize(platform, ge::Shape({1, static_cast<int64_t>(e_align)}),
-                                    ge::Shape({batch, static_cast<int64_t>(e_align)}), sizeof(float), true,
-                                    bcast_tmp_max, bias_bcast_tmp);
-    (void)GetBroadCastMaxMinTmpSize(platform, ge::Shape({batch, 1}), ge::Shape({batch, k_align}), sizeof(float), false,
-                                    bcast_tmp_max, row_bcast_tmp);
-    (void)GetBroadCastMaxMinTmpSize(platform, ge::Shape({1, k_align}), ge::Shape({batch, k_align}), sizeof(float),
-                                    false, bcast_tmp_max, mask_bcast_tmp);
-    shared_tmp = std::max({sum_tmp_max, bias_bcast_tmp, row_bcast_tmp, mask_bcast_tmp});
-
-    // Mirror every InitBuffer in RouteBatchKernel, including double-buffered
-    // queues and both FP32 Softplus predicate masks. The library temporary is
-    // the larger of the broadcast/sum scratch and TopK scratch.
-    const uint64_t score_queue = 2ULL * batch * e_align * sizeof(float);
-    const uint64_t weight_queue = 2ULL * batch * k_align * sizeof(float);
-    const uint64_t score_buffers = 2ULL * batch * e_align * sizeof(float);
-    const uint64_t k_buffers = static_cast<uint64_t>(batch) * k_align * (8 * sizeof(float) + sizeof(int64_t));
-    const uint64_t fixed = e_align * sizeof(int32_t) + CeilDiv(batch, 8) * 8 * sizeof(float) + k_align * sizeof(float);
-    const uint64_t predicate = 2ULL * CeilDiv(batch * e_align, 256) * 32ULL;
-    const uint64_t vision_buffers =
-      inputs.use_vision_bias ? 2ULL * e_align * sizeof(float) + AlignUp(batch * sizeof(bool), 32) : 0;
-    const uint64_t total = score_queue + weight_queue + score_buffers + k_buffers + fixed + predicate + shared_tmp +
-                           topk_tmp + vision_buffers;
-    if (total <= ub_size / 2) {
-      return true;
-    }
-    if (batch == 1) {
-      OP_LOGE(context->GetNodeName(), "Route buffers exceed available UB.");
-      return false;
-    }
-    batch = std::max(1u, batch / 2);
-  }
-  return false;
 }
 
 ge::graphStatus TilingFunc(gert::TilingContext *context) {
@@ -190,7 +117,7 @@ ge::graphStatus TilingFunc(gert::TilingContext *context) {
     OP_LOGE(context->GetNodeName(), "HyperMegaGateRoute requires AIV cores.");
     return ge::GRAPH_FAILED;
   }
-  const uint32_t worker_capacity = std::min({inputs.tokens, vector_cores, kAivWorkerSlotCapacity});
+  const uint32_t worker_capacity = std::min(inputs.tokens, vector_cores);
   const uint32_t rows_per_worker = CeilDiv(inputs.tokens, worker_capacity);
   const uint32_t active_workers = CeilDiv(inputs.tokens, rows_per_worker);
   const uint32_t e_align = CeilDiv(inputs.expert_count, kExpertAlignment) * kExpertAlignment;
@@ -212,13 +139,16 @@ ge::graphStatus TilingFunc(gert::TilingContext *context) {
   tiling.set_routedScalingFactor(inputs.scaling);
   tiling.set_activeAivWorkerCount(active_workers);
   tiling.set_rowsPerWorker(rows_per_worker);
-  tiling.set_aivWorkerSlotCapacity(kAivWorkerSlotCapacity);
+  tiling.set_aivWorkerSlotCapacity(vector_cores);
   tiling.set_batchRows(batch);
   tiling.set_expertAlign(e_align);
   tiling.set_kAlign(k_align);
   tiling.set_sharedTmpBytes(shared_tmp);
   tiling.set_stageCount(kRouteStageCount);
   tiling.set_useVisionBias(inputs.use_vision_bias ? 1U : 0U);
+  tiling.set_useSigmoid(inputs.use_sigmoid ? 1U : 0U);
+  tiling.set_normalize(inputs.normalize ? 1U : 0U);
+  tiling.set_useBias(inputs.use_bias ? 1U : 0U);
   tiling.set_runtimeConfigBytes(inputs.runtime_bytes);
   tiling.set_diagnosticBufferBytes(inputs.profile_bytes);
   uint64_t route_workspace = 0;

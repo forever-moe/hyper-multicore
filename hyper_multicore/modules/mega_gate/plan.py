@@ -32,12 +32,13 @@ from hyper_multicore.scheduler.config import (
     RuntimeConfigC,
     NUM_WORKERS_VECTOR,
 )
-from hyper_multicore.scheduler.runtime import allocate_runtime_config
+from hyper_multicore.scheduler.runtime import allocate_runtime_config, serialize_runtime_config
 
 from .diagnostics import (
     MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES,
     MEGA_GATE_ROUTE_GRAD_STAGE_NAMES,
     MEGA_GATE_ROUTE_STAGE_NAMES,
+    MEGA_GATE_SIGMOID_ROUTE_STAGE_NAMES,
     bind_pipeline_graph,
 )
 
@@ -82,6 +83,7 @@ class MegaGatePlan:
     route_grad_runtime: MegaKernelDiagnostics
     route_grad_k1_runtime: MegaKernelDiagnostics
     vision_mask_placeholder: torch.Tensor
+    use_sigmoid: bool = False
 
 
 def _build_pipeline_runtime_config(
@@ -89,15 +91,18 @@ def _build_pipeline_runtime_config(
     stage_names: tuple[str, ...],
     *,
     kernel_name: str,
+    worker_capacity: int = MEGA_GATE_AIV_WORKER_CAPACITY,
 ) -> RuntimeConfigC:
     """Create descriptors broadcast to every active token-row worker."""
     if len(task_types) != len(stage_names):
         raise RuntimeError("MegaGate task types and profile stages must have equal length")
     if not isinstance(kernel_name, str) or not kernel_name:
         raise ValueError("MegaGate kernel_name must be a non-empty string")
-    runtime_config = allocate_runtime_config(len(task_types))
+    if not isinstance(worker_capacity, int) or isinstance(worker_capacity, bool) or worker_capacity <= 0:
+        raise ValueError("MegaGate worker_capacity must be a positive integer")
+    runtime_config = allocate_runtime_config(len(task_types), num_workers=worker_capacity)
     runtime_config.task_num = len(task_types)
-    runtime_config.num_workers = MEGA_GATE_AIV_WORKER_CAPACITY
+    runtime_config.num_workers = worker_capacity
     runtime_config.task_index_num[1] = len(task_types)
     for task_id, task_type in enumerate(task_types):
         task = TaskDescC()
@@ -106,7 +111,7 @@ def _build_pipeline_runtime_config(
         task.trigger_event = EVENT_INVALID_ID
         task.dependent_event = EVENT_INVALID_ID
         task.task_index = 0
-        task.task_split_num = MEGA_GATE_AIV_WORKER_CAPACITY
+        task.task_split_num = worker_capacity
         task.tiling_data_offset = task_id
         task.profile_owner_id = INVALID_PROFILE_OWNER_ID
         runtime_config.all_tasks[task_id] = task
@@ -114,18 +119,24 @@ def _build_pipeline_runtime_config(
     return runtime_config
 
 
-def build_mega_gate_plan(device: torch.device) -> MegaGatePlan:
+def build_mega_gate_plan(device: torch.device, *, use_sigmoid: bool = False) -> MegaGatePlan:
     """Build an eventless Route runtime for one NPU device.
 
     Args:
         device: NPU device receiving the serialized RuntimeConfig.
+        use_sigmoid: Use sigmoid stage identities and tensor ports in diagnostic captures.
 
     Returns:
         Immutable plan with normal and profiled broadcast stage descriptors.
     """
     if device.type != "npu":
         raise ValueError(f"MegaGate plan requires an NPU device, got {device}")
+    if device.index is None:
+        device = torch.device("npu", torch.npu.current_device())
     rank = dist.get_rank() if dist.is_initialized() else 0
+    available_workers = torch.npu.get_device_limit(device.index)["vector_core_num"]
+    if not isinstance(available_workers, int) or isinstance(available_workers, bool) or available_workers <= 0:
+        raise RuntimeError("MegaGate requires a positive vector_core_num device limit")
 
     def prepare(runtime_config: RuntimeConfigC, *, backward: bool = False) -> MegaKernelDiagnostics:
         """Prepare only ordinary storage; broadcast graph ports remain lazy.
@@ -138,24 +149,51 @@ def build_mega_gate_plan(device: torch.device) -> MegaGatePlan:
             None, runtime_config, kernel_name="HyperMegaGateRouteGrad" if backward else "HyperMegaGateRoute",
             parameter_count=11, device=device, rank=rank, owner_label="TokenRowShard",
             execution_mode="aiv_pipeline", vector_worker_stride=1,
-            graph_adapter=partial(bind_pipeline_graph, backward=backward),
+            graph_adapter=partial(bind_pipeline_graph, backward=backward, use_sigmoid=use_sigmoid),
         )
 
-    return MegaGatePlan(
+    result = MegaGatePlan(
         route_runtime=prepare(_build_pipeline_runtime_config(
             MEGA_GATE_ROUTE_TASK_TYPES,
-            MEGA_GATE_ROUTE_STAGE_NAMES,
-            kernel_name="HyperMegaGateRoute",
+            MEGA_GATE_SIGMOID_ROUTE_STAGE_NAMES if use_sigmoid else MEGA_GATE_ROUTE_STAGE_NAMES,
+            kernel_name="HyperMegaGateRoute", worker_capacity=available_workers,
         )),
         route_grad_runtime=prepare(_build_pipeline_runtime_config(
             MEGA_GATE_ROUTE_GRAD_TASK_TYPES,
             MEGA_GATE_ROUTE_GRAD_STAGE_NAMES,
-            kernel_name="HyperMegaGateRouteGrad",
+            kernel_name="HyperMegaGateRouteGrad", worker_capacity=available_workers,
         ), backward=True),
         route_grad_k1_runtime=prepare(_build_pipeline_runtime_config(
             MEGA_GATE_ROUTE_GRAD_K1_TASK_TYPES,
             MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES,
-            kernel_name="HyperMegaGateRouteGrad",
+            kernel_name="HyperMegaGateRouteGrad", worker_capacity=available_workers,
         ), backward=True),
         vision_mask_placeholder=torch.zeros((1,), device=device, dtype=torch.bool),
+        use_sigmoid=use_sigmoid,
     )
+    torch.npu.current_stream(device).synchronize()
+    return result
+
+
+def _build_projection_runtime(device: torch.device) -> torch.Tensor:
+    """Serialize the pinned 32 AIC / 64 AIV projection and route tile schedule."""
+    config = allocate_runtime_config(11, num_workers=64)
+    config.task_num = 11
+    config.num_workers = 64
+    config.task_index_num[0] = 1
+    config.task_index_num[1] = 10
+    config.cube_task_indices[0] = 0
+    for index, kind in enumerate((TaskType.TASK_MATMUL, *MEGA_GATE_ROUTE_TASK_TYPES)):
+        task = TaskDescC()
+        task.task_type = kind
+        task.task_aicore_type = (TaskAiCoreType.TASK_AICORE_CUBE if index == 0
+                                else TaskAiCoreType.TASK_AICORE_VECTOR)
+        task.trigger_event = EVENT_INVALID_ID
+        task.dependent_event = EVENT_INVALID_ID
+        task.task_split_num = 32 if index == 0 else 64
+        task.tiling_data_offset = 0 if index == 0 else index - 1
+        task.profile_owner_id = INVALID_PROFILE_OWNER_ID
+        config.all_tasks[index] = task
+        if index:
+            config.vector_task_indices[index - 1] = index
+    return torch.frombuffer(bytearray(serialize_runtime_config(config)), dtype=torch.uint8).clone().to(device)

@@ -202,6 +202,7 @@ function validate_multicore_vendor() {
     local -a libraries=()
     local -a artifacts=()
     local -a validation_socs=()
+    local -a validation_operators=()
     local -a required_symbols=(
         aclnnHyperMegaMoe
         aclnnHyperMegaMoeGetWorkspaceSize
@@ -213,7 +214,14 @@ function validate_multicore_vendor() {
         aclnnHyperMegaGateRouteGetWorkspaceSize
         aclnnHyperMegaGateRouteGrad
         aclnnHyperMegaGateRouteGradGetWorkspaceSize
+        aclnnHyperMegaGateSigmoidRouteV2
+        aclnnHyperMegaGateSigmoidRouteV2GetWorkspaceSize
+        aclnnHyperMegaGateSigmoidRouteGrad
+        aclnnHyperMegaGateSigmoidRouteGradGetWorkspaceSize
     )
+    if [[ ",${soc_list}," == *,ascend950,* ]]; then
+        required_symbols+=(aclnnHyperMegaGateProjection aclnnHyperMegaGateProjectionGetWorkspaceSize)
+    fi
 
     if [[ -n "${build_log}" ]]; then
         validate_multicore_build_log "${build_log}"
@@ -246,8 +254,12 @@ function validate_multicore_vendor() {
 
     IFS=',' read -r -a validation_socs <<< "${soc_list}"
     for soc in "${validation_socs[@]}"; do
-        for op_name in hyper_mega_moe hyper_mega_moe_grad hyper_mega_mhc hyper_mega_mhc_grad \
-                hyper_mega_gate_route hyper_mega_gate_route_grad; do
+        validation_operators=(hyper_mega_moe hyper_mega_moe_grad hyper_mega_mhc hyper_mega_mhc_grad
+            hyper_mega_gate_route hyper_mega_gate_route_grad)
+        if [[ "${soc}" == ascend950 ]]; then
+            validation_operators+=(hyper_mega_gate_projection)
+        fi
+        for op_name in "${validation_operators[@]}"; do
             mapfile -t artifacts < <(
                 find "${vendor_root}/op_impl/ai_core/tbe/kernel/${soc}/${op_name}" \
                     -maxdepth 1 -type f -name '*.o' -print 2>/dev/null
@@ -277,8 +289,7 @@ function validate_multicore_vendor() {
         require_nonempty_artifact \
             "${vendor_root}/op_impl/ai_core/tbe/kernel/config/${soc}/binary_info_config.json" \
             "${soc} binary index"
-        for op_name in hyper_mega_moe hyper_mega_moe_grad hyper_mega_mhc hyper_mega_mhc_grad \
-                hyper_mega_gate_route hyper_mega_gate_route_grad; do
+        for op_name in "${validation_operators[@]}"; do
             require_nonempty_artifact \
                 "${vendor_root}/op_impl/ai_core/tbe/kernel/config/${soc}/${op_name}.json" \
                 "${soc} ${op_name} binary config"

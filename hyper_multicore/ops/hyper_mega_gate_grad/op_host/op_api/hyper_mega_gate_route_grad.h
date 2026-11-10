@@ -28,7 +28,8 @@ RouteGradOutputs HyperMegaGateRouteGradKernel(const aclTensor *selected_scores,
                                               const aclTensor *grad_routing_weights, const aclTensor *route_scores,
                                               const aclTensor *expert_indices, const aclTensor *runtime_config,
                                               const aclTensor *diagnostic_buffer, int64_t top_k,
-                                              float routed_scaling_factor, aclOpExecutor *executor);
+                                              float routed_scaling_factor, aclOpExecutor *executor,
+                                              bool normalize = true);
 
 /**
  * @brief Append RouteGrad and its production CANN post-processing kernels.
@@ -44,7 +45,7 @@ const aclTensor *HyperMegaGateRouteGrad(const aclTensor *logits, const aclTensor
                                         const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
                                         const aclTensor *runtime_config, const aclTensor *diagnostic_buffer,
                                         int64_t top_k, float routed_scaling_factor, const aclTensor *output,
-                                        aclOpExecutor *executor);
+                                        aclOpExecutor *executor, bool use_sigmoid = false, bool normalize = true);
 
 }  // namespace l0op
 

@@ -72,6 +72,11 @@ bias初始化为零。`hidden_states`形状为
 传入`image_mask`时，mask形状须为`[batch, sequence]`；启用视觉bias时还须是同一NPU上的连续BOOL Tensor。
 外层BF16 autocast开启时Projection产生BF16 logits；MegaGate将其转换为FP32后调用native Route。
 
+The caller-owned A5 sigmoid routing and fused projection APIs are documented in
+[A5 MegaGate](../docs/mega_gate_a5.md), including independent examples, numerical
+contracts and migration qualification. The existing `MegaGate` class retains its
+text/vision interface.
+
 ### MegaMhc
 
 `MegaMhc` 执行 shifted mHC 的 block 边界：将上一 block 的输出写入残差流，

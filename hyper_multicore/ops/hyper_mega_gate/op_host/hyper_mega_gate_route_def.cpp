@@ -25,6 +25,9 @@ class HyperMegaGateRoute : public OpDef {
     this->Attr("top_k").AttrType(REQUIRED).Int();
     this->Attr("routed_scaling_factor").AttrType(REQUIRED).Float();
     this->Attr("use_vision_bias").AttrType(REQUIRED).Bool();
+    this->Attr("use_sigmoid").AttrType(OPTIONAL).Bool(false);
+    this->Attr("normalize").AttrType(OPTIONAL).Bool(true);
+    this->Attr("use_bias").AttrType(OPTIONAL).Bool(true);
 
     OpAICoreConfig config;
     config.DynamicCompileStaticFlag(true)

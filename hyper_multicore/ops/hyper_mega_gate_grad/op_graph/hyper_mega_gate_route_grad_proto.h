@@ -23,6 +23,7 @@ REG_OP(HyperMegaGateRouteGrad)
   .OUTPUT(zero_score_grad, TensorType({DT_FLOAT}))
   .REQUIRED_ATTR(top_k, Int)
   .REQUIRED_ATTR(routed_scaling_factor, Float)
+  .ATTR(normalize, Bool, true)
   .OP_END_FACTORY_REG(HyperMegaGateRouteGrad)
 
 }  // namespace ge

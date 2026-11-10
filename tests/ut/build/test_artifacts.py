@@ -46,8 +46,11 @@ def _payload_fixture(root, socs=("ascend910b",)):
         binaries = {}
         resources.extend((f"{base}/config/{soc}/aic-{soc}-ops-info.json",
                           f"{base}/kernel/config/{soc}/binary_info_config.json"))
-        for operator in ("hyper_mega_moe", "hyper_mega_moe_grad", "hyper_mega_mhc", "hyper_mega_mhc_grad",
-                         "hyper_mega_gate_route", "hyper_mega_gate_route_grad"):
+        operators = ("hyper_mega_moe", "hyper_mega_moe_grad", "hyper_mega_mhc", "hyper_mega_mhc_grad",
+                     "hyper_mega_gate_route", "hyper_mega_gate_route_grad")
+        if soc == "ascend950":
+            operators += ("hyper_mega_moe_mxfp8", "hyper_mega_moe_mxfp8_grad", "hyper_mega_gate_projection")
+        for operator in operators:
             variants = ("kernel", "alternative") if operator == "hyper_mega_moe" else ("kernel",)
             binary_list, bin_list = [], []
             for variant in variants:
@@ -79,6 +82,19 @@ def _payload_fixture(root, socs=("ascend910b",)):
 
 class TestArtifacts(unittest.TestCase):
     """Keep PTA labels and required native inputs explicit."""
+
+    def test_a5_projection_binary_is_required(self):
+        """A missing projection object cannot pass with an otherwise consistent manifest."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            info = _payload_fixture(root, socs=("ascend950",))
+            HELPER.validate_payload(root, info)
+            relative = ("lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/kernel/"
+                        "ascend950/hyper_mega_gate_projection/kernel.o")
+            (root / relative).unlink()
+            del info["payload_sha256"][relative]
+            with self.assertRaisesRegex(RuntimeError, "hyper_mega_gate_projection"):
+                HELPER.validate_payload(root, info)
 
     def test_pta_version_and_post_release(self):
         """PTA supplies the complete public label, not the Torch version."""

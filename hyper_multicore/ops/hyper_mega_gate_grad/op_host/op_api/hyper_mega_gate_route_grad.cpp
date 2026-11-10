@@ -50,7 +50,7 @@ RouteGradOutputs HyperMegaGateRouteGradKernel(const aclTensor *selected_scores,
                                               const aclTensor *grad_routing_weights, const aclTensor *route_scores,
                                               const aclTensor *expert_indices, const aclTensor *runtime_config,
                                               const aclTensor *diagnostic_buffer, int64_t top_k,
-                                              float routed_scaling_factor, aclOpExecutor *executor) {
+                                              float routed_scaling_factor, aclOpExecutor *executor, bool normalize) {
   L0_DFX(HyperMegaGateRouteGradKernel, selected_scores, normalization_denominator, grad_routing_weights, route_scores,
          expert_indices, runtime_config, diagnostic_buffer, top_k, routed_scaling_factor);
   RouteGradOutputs outputs{nullptr, nullptr};
@@ -90,7 +90,8 @@ RouteGradOutputs HyperMegaGateRouteGradKernel(const aclTensor *selected_scores,
     ADD_TO_LAUNCHER_LIST_AICORE(HyperMegaGateRouteGrad,
                                 OP_INPUT(selected_scores_matrix, denominator_matrix, grad_weights_matrix,
                                          route_scores_matrix, expert_indices_matrix, runtime_config, diagnostic_buffer),
-                                OP_OUTPUT(selected_score_grad, zero_score_grad), OP_ATTR(top_k, routed_scaling_factor));
+                                OP_OUTPUT(selected_score_grad, zero_score_grad),
+                                OP_ATTR(top_k, routed_scaling_factor, normalize));
   CHECK_RET(status == ACLNN_SUCCESS, outputs);
   outputs.selected_score_grad = selected_score_grad;
   outputs.zero_score_grad = zero_score_grad;
@@ -102,7 +103,7 @@ const aclTensor *HyperMegaGateRouteGrad(const aclTensor *logits, const aclTensor
                                         const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
                                         const aclTensor *runtime_config, const aclTensor *diagnostic_buffer,
                                         int64_t top_k, float routed_scaling_factor, const aclTensor *output,
-                                        aclOpExecutor *executor) {
+                                        aclOpExecutor *executor, bool use_sigmoid, bool normalize) {
   L0_DFX(HyperMegaGateRouteGrad, logits, route_scores, selected_scores, normalization_denominator, expert_indices,
          grad_routing_weights, top_k, routed_scaling_factor);
   CHECK_RET(logits != nullptr && route_scores != nullptr && selected_scores != nullptr &&
@@ -112,13 +113,16 @@ const aclTensor *HyperMegaGateRouteGrad(const aclTensor *logits, const aclTensor
 
   const auto route_grad = HyperMegaGateRouteGradKernel(selected_scores, normalization_denominator, grad_routing_weights,
                                                        route_scores, expert_indices, runtime_config, diagnostic_buffer,
-                                                       top_k, routed_scaling_factor, executor);
+                                                       top_k, routed_scaling_factor, executor, normalize);
   CHECK_RET(route_grad.selected_score_grad != nullptr && route_grad.zero_score_grad != nullptr, nullptr);
   const auto *scatter_indices = HyperMegaGateScatterIndices(expert_indices, route_grad.zero_score_grad, executor);
   CHECK_RET(scatter_indices != nullptr, nullptr);
   const auto *score_grad = HyperMegaGateScatterSelectedGrad(route_grad.zero_score_grad, scatter_indices,
                                                             route_grad.selected_score_grad, executor);
   CHECK_RET(score_grad != nullptr, nullptr);
+  if (use_sigmoid) {
+    return HyperMegaGateSigmoidGrad(score_grad, route_scores, output, executor);
+  }
   const auto *doubled_scores = HyperMegaGateDoubleRouteScores(route_scores, executor);
   CHECK_RET(doubled_scores != nullptr, nullptr);
   const auto *sqrt_input_grad = HyperMegaGateSqrtInputGrad(score_grad, doubled_scores, executor);

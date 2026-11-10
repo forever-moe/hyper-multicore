@@ -1,0 +1,799 @@
+{
+  "passed": true,
+  "groups": 24,
+  "tensors": 104,
+  "results": {
+    "T4096/route/forward/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/forward/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/forward/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/training/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/training/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/training/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/training/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/training/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/checkpoint/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/checkpoint/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/checkpoint/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/checkpoint/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/checkpoint/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/forward/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/forward/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/forward/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/training/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/training/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/training/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/training/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/training/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/checkpoint/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/route/checkpoint/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/route/checkpoint/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/route/checkpoint/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/route/checkpoint/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/forward/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/forward/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/forward/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/training/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/training/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/training/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/training/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/training/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/checkpoint/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/checkpoint/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/checkpoint/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/checkpoint/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/checkpoint/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/forward/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/forward/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/forward/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/training/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/training/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/training/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/training/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/training/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/checkpoint/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T4096/projection/checkpoint/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T4096/projection/checkpoint/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T4096/projection/checkpoint/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T4096/projection/checkpoint/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/forward/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/forward/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/forward/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/training/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/training/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/training/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/training/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/training/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/checkpoint/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/checkpoint/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/checkpoint/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/checkpoint/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/checkpoint/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/forward/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/forward/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/forward/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/training/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/training/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/training/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/training/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/training/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/checkpoint/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/route/checkpoint/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/route/checkpoint/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/route/checkpoint/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/route/checkpoint/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/forward/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/forward/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/forward/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/training/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/training/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/training/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/training/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/training/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/checkpoint/fixedFalse/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/checkpoint/fixedFalse/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/checkpoint/fixedFalse/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/checkpoint/fixedFalse/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/checkpoint/fixedFalse/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/forward/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/forward/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/forward/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/training/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/training/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/training/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/training/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/training/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/checkpoint/fixedTrue/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "T6144/projection/checkpoint/fixedTrue/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "T6144/projection/checkpoint/fixedTrue/2": {
+      "equal": true,
+      "shape": [
+        384
+      ],
+      "dtype": "torch.int32"
+    },
+    "T6144/projection/checkpoint/fixedTrue/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "T6144/projection/checkpoint/fixedTrue/4": {
+      "equal": true,
+      "shape": [
+        1966080
+      ],
+      "dtype": "torch.bfloat16"
+    }
+  }
+}

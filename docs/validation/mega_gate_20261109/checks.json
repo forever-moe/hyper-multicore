@@ -1,0 +1,28 @@
+{
+  "cpu": {
+    "passed": 349,
+    "subtests": 1943
+  },
+  "npu": {
+    "passed": 11
+  },
+  "tensor_comparison": {
+    "passed": true,
+    "groups": 49,
+    "tensors": 210
+  },
+  "distributed": {
+    "tp2_sequence_parallel": true,
+    "hyper_fsdp2": true
+  },
+  "relocation_forward_backward": true,
+  "lizard_changed_files": true,
+  "performance": {
+    "passed": true,
+    "measurements": 20,
+    "regression_limit": 0.02,
+    "max_confidence95_upper": 0.01785402720168014,
+    "component_peak_memory_equal": true,
+    "component_retained_extra_bytes": 0
+  }
+}

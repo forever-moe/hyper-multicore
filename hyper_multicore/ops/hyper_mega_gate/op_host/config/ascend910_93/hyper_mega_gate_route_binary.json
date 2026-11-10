@@ -22,7 +22,10 @@
       "attrs": [
         {"name": "top_k", "dtype": "int", "value": 6},
         {"name": "routed_scaling_factor", "dtype": "float", "value": 1.5},
-        {"name": "use_vision_bias", "dtype": "bool", "value": false}
+        {"name": "use_vision_bias", "dtype": "bool", "value": false},
+        {"name": "use_sigmoid", "dtype": "bool", "value": false},
+        {"name": "normalize", "dtype": "bool", "value": true},
+        {"name": "use_bias", "dtype": "bool", "value": true}
       ]
     }
   ]

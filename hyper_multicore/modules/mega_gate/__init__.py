@@ -15,5 +15,7 @@
 """MegaGate router component."""
 
 from .module import MegaGate
+from .projection import sigmoid_route_from_hidden_states
+from .sigmoid import sigmoid_route_from_logits
 
-__all__ = ["MegaGate"]
+__all__ = ["MegaGate", "sigmoid_route_from_logits", "sigmoid_route_from_hidden_states"]

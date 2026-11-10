@@ -44,6 +44,8 @@ npu_op_kernel_options(ascendc_kernels ALL OPTIONS
     -I${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_moe_mxfp8/op_kernel/cgmct/utils
     -I${HP_SHMEM_SDK_ROOT}/src/device
     -I${HP_MULTICORE_SOURCE_ROOT}/shmem
+    -I${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_gate_projection/op_kernel/matmul_common
+    -I${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_gate_projection/op_kernel/matmul_arch35
     -Wno-macro-redefined
     -Wno-ignored-attributes
 )
@@ -87,6 +89,12 @@ npu_op_kernel_sources(ascendc_kernels
 
 
 if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+    npu_op_kernel_sources(ascendc_kernels
+        OP_TYPE HyperMegaGateProjection
+        KERNEL_DIR ./hyper_mega_gate_projection/op_kernel
+        KERNEL_FILE hyper_mega_gate_projection.cpp
+        COMPUTE_UNIT ${KERNEL_COMPUTE_UNIT}
+    )
     npu_op_kernel_sources(ascendc_kernels
         OP_TYPE HyperMegaMoeMxfp8
         KERNEL_DIR ./hyper_mega_moe_mxfp8/op_kernel

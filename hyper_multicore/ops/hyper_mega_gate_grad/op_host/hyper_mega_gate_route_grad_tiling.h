@@ -18,6 +18,7 @@ TILING_DATA_FIELD_DEF(uint32_t, expertCount);
 TILING_DATA_FIELD_DEF(uint32_t, topK);
 TILING_DATA_FIELD_DEF(float, routedScalingFactor);
 TILING_DATA_FIELD_DEF(uint32_t, stageCount);
+TILING_DATA_FIELD_DEF(uint32_t, normalize);
 TILING_DATA_FIELD_DEF(uint32_t, activeAivWorkerCount);
 TILING_DATA_FIELD_DEF(uint32_t, rowsPerWorker);
 TILING_DATA_FIELD_DEF(uint32_t, aivWorkerSlotCapacity);

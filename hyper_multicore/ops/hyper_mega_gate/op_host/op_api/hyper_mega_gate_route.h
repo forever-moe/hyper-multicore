@@ -38,7 +38,7 @@ const std::array<const aclTensor *, 5> HyperMegaGateRoute(
   const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
   const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
   const aclTensor *normalization_denominator, int64_t top_k, float routed_scaling_factor, bool use_vision_bias,
-  aclOpExecutor *executor);
+  aclOpExecutor *executor, bool use_sigmoid = false, bool normalize = true, bool use_bias = true);
 
 }  // namespace l0op
 

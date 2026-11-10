@@ -1,0 +1,127 @@
+{
+  "passed": false,
+  "regression_limit": 0.02,
+  "processes_per_side": 2,
+  "results": {
+    "T4096/route/forward": {
+      "source_ms": 0.8568018341064453,
+      "target_ms": 0.8570241165161132,
+      "change": 0.00025943269589245865,
+      "confidence95": [
+        -0.0012603457331137186,
+        0.0018658717912962634
+      ],
+      "status": "pass"
+    },
+    "T4096/route/training": {
+      "source_ms": 2.4591365814208985,
+      "target_ms": 2.45980583190918,
+      "change": 0.00027214856358037665,
+      "confidence95": [
+        -0.00025083898320643616,
+        0.006808773405620204
+      ],
+      "status": "pass"
+    },
+    "T4096/route/checkpoint": {
+      "source_ms": 3.3210218811035155,
+      "target_ms": 3.3575119018554687,
+      "change": 0.010987588175669583,
+      "confidence95": [
+        -0.00363775796218202,
+        0.02212489084493781
+      ],
+      "status": "inconclusive"
+    },
+    "T4096/projection/forward": {
+      "source_ms": 0.7845924758911134,
+      "target_ms": 0.822206916809082,
+      "change": 0.047941373482134786,
+      "confidence95": [
+        0.0015496789227489815,
+        0.10205307687353428
+      ],
+      "status": "inconclusive"
+    },
+    "T4096/projection/training": {
+      "source_ms": 2.3501983642578126,
+      "target_ms": 2.6190946960449217,
+      "change": 0.11441431322416307,
+      "confidence95": [
+        0.09645130230681787,
+        0.1340814729162107
+      ],
+      "status": "regression"
+    },
+    "T4096/projection/checkpoint": {
+      "source_ms": 3.2641586303710937,
+      "target_ms": 3.777150115966797,
+      "change": 0.1571588711475651,
+      "confidence95": [
+        0.094437475127529,
+        0.2244024255094346
+      ],
+      "status": "regression"
+    },
+    "T6144/route/forward": {
+      "source_ms": 1.2767412948608396,
+      "target_ms": 1.2766789627075195,
+      "change": -4.8821287108924416e-05,
+      "confidence95": [
+        -0.0004062069397412382,
+        0.0006580121418537921
+      ],
+      "status": "pass"
+    },
+    "T6144/route/training": {
+      "source_ms": 3.56775390625,
+      "target_ms": 3.568934173583984,
+      "change": 0.0003308152313747925,
+      "confidence95": [
+        -0.0008490340608415803,
+        0.0009658028605288305
+      ],
+      "status": "pass"
+    },
+    "T6144/route/checkpoint": {
+      "source_ms": 4.843455505371094,
+      "target_ms": 4.843384857177734,
+      "change": -1.4586320300047362e-05,
+      "confidence95": [
+        -0.0009546274502559848,
+        0.000256236597757864
+      ],
+      "status": "pass"
+    },
+    "T6144/projection/forward": {
+      "source_ms": 1.1532098388671876,
+      "target_ms": 1.154005317687988,
+      "change": 0.0006897953815430125,
+      "confidence95": [
+        8.413358349379507e-05,
+        0.001672828290567141
+      ],
+      "status": "pass"
+    },
+    "T6144/projection/training": {
+      "source_ms": 3.4143385314941406,
+      "target_ms": 3.417165069580078,
+      "change": 0.0008278435368564985,
+      "confidence95": [
+        -4.418540416270544e-05,
+        0.0012885181752307071
+      ],
+      "status": "pass"
+    },
+    "T6144/projection/checkpoint": {
+      "source_ms": 4.566042633056641,
+      "target_ms": 4.568996276855469,
+      "change": 0.0006468717084338049,
+      "confidence95": [
+        -0.00014860391281334984,
+        0.0009348695305362309
+      ],
+      "status": "pass"
+    }
+  }
+}

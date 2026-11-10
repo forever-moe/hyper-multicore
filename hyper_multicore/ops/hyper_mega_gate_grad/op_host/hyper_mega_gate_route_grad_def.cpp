@@ -22,6 +22,7 @@ class HyperMegaGateRouteGrad : public OpDef {
     this->Output("zero_score_grad").ParamType(REQUIRED).DataType({ge::DT_FLOAT}).Format({ge::FORMAT_ND});
     this->Attr("top_k").AttrType(REQUIRED).Int();
     this->Attr("routed_scaling_factor").AttrType(REQUIRED).Float();
+    this->Attr("normalize").AttrType(OPTIONAL).Bool(true);
     OpAICoreConfig config;
     config.DynamicCompileStaticFlag(true)
       .DynamicFormatFlag(true)

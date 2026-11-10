@@ -452,7 +452,7 @@ def _check_mega_gate_rejects_second_derivative() -> None:
 
 
 def _check_mega_gate_pipeline_profile() -> None:
-    """Require the 49-token tail case to expose ten stages on 25 active AIVs."""
+    """Require every active worker in the 49-token tail case to expose ten stages."""
     tokens = 49
     gate = _make_gate()
     hidden, weight, bias = _make_inputs(1, tokens, seed=36 + tokens)
@@ -470,7 +470,9 @@ def _check_mega_gate_pipeline_profile() -> None:
     events = [event for event in trace["traceEvents"] if event.get("ph") == "X"]
     assert metadata["invocationCount"] == 1
     worker_ids = sorted({event["args"]["block_id"] for event in events})
-    assert len(worker_ids) == 25
+    capacity = min(tokens, torch.npu.get_device_limit(torch.npu.current_device())["vector_core_num"])
+    rows_per_worker = (tokens + capacity - 1) // capacity
+    assert len(worker_ids) == (tokens + rows_per_worker - 1) // rows_per_worker
     assert worker_ids == list(range(len(worker_ids)))
     assert metadata["recordCount"] == len(worker_ids) * 10
     assert metadata["droppedRecordCount"] == 0
@@ -505,7 +507,7 @@ def _check_mega_gate_grad_pipeline_profile() -> None:
     worker_ids = sorted({event["args"]["block_id"] for event in events})
     stage_count = len(MEGA_GATE_ROUTE_GRAD_STAGE_NAMES)
     assert metadata["invocationCount"] == 1
-    assert 0 < len(worker_ids) <= 48
+    assert 0 < len(worker_ids) <= torch.npu.get_device_limit(torch.npu.current_device())["vector_core_num"]
     assert metadata["recordCount"] == len(worker_ids) * stage_count
     assert metadata["droppedRecordCount"] == 0
     assert metadata["warnings"] == []

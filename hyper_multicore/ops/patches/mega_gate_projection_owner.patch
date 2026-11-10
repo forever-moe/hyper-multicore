@@ -1,0 +1,10 @@
+--- a/matmul/common/cmct/kernel/kernel_matmul_without_que.h
++++ b/matmul/common/cmct/kernel/kernel_matmul_without_que.h
+@@ -201 +201 @@
+-    __aicore__ inline void operator()(Params const &params)
++    __aicore__ inline void operator()(Params const &params, int64_t logicalBlockIdx = -1, int64_t logicalBlockNum = -1)
+@@ -208,2 +208,2 @@
+-        int64_t curBlockIdx = AscendC::GetBlockIdx();
+-        int64_t blockNum = AscendC::GetBlockNum();
++        int64_t curBlockIdx = logicalBlockIdx >= 0 ? logicalBlockIdx : AscendC::GetBlockIdx();
++        int64_t blockNum = logicalBlockNum > 0 ? logicalBlockNum : AscendC::GetBlockNum();

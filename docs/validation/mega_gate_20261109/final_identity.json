@@ -1,0 +1,65 @@
+{
+  "payload_integrity": true,
+  "source_identity_matches": true,
+  "source_reference_unchanged": true,
+  "common_bridge_unchanged": true,
+  "reference_files": 67,
+  "build_commit": "fd8131f24512ccf0764b277460630e7d2b8cb0fd",
+  "source_sha256": "30a3b1fb9cb5f92f2b5cdf2f64a07445aeb73a1a6dd6552b1f0ecaba9ab67aed",
+  "cann_version": "9.2.0",
+  "soc_list": [
+    "ascend950"
+  ],
+  "native_sha256": {
+    "lib/vendors/hyper_multicore_nn/op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so": "61cfaf770ca6900abacb905987d85902c2e37b942fc54cc972e4448ce669ee79",
+    "lib/vendors/hyper_multicore_nn/op_api/lib/libcust_opapi.so": "e9a7bafc91015d0874e07b22931c9a6c3fa9c48ec585b2b4daa283faef69d00a",
+    "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/liboptiling.so": "b4802c2f1a8446833bfd6262c515c49c7cf37c665174d2937260359ea7809d67",
+    "lib/vendors/hyper_multicore_nn/op_impl/ai_core/tbe/op_tiling/lib/linux/aarch64/libcust_opmaster_rt2.0.so": "b4802c2f1a8446833bfd6262c515c49c7cf37c665174d2937260359ea7809d67",
+    "shmem/lib/libhyper_multicore_shmem_ops.so": "cd293a3bcbb5410edb4ebf3a0da191f3c47aa8265a55fc1b218daa56b23e0726",
+    "shmem/lib/shmem/aclshmem_bootstrap_uid.so": "48504567a99e1c845b6ea916eb6bbf0a3f6afba01c30f120e009ec49ecf28d5d",
+    "shmem/lib/shmem/aclshmem_bootstrap_config_store.so": "4cb21b38c78d5e93a8ba6d759176807035430fd98d93bf13a31c54f47f769151",
+    "shmem/lib/shmem/libhyper_multicore_shmem.so": "c96a0ef1772edd4b8baebbc19e72c5d7a9830bfb772dd674f588acdadb38758d",
+    "shmem/lib/shmem/libhyper_multicore_shmem_utils.so": "d4c9288cfe8312a4f10208c2614a0af6734fcae2ccd00335a3abb4a1b2be2ccb",
+    "adapters/pt2.12.0.post3-568df3012d33/hyper_multicore_shmem_torch.so": "f8d80ef29a4f8c926ec2364426921fb40f611e46781bd5061572ecae84d8d6fe",
+    "adapters/pt2.12.0.post3-568df3012d33/libhyper_multicore_torch.so": "a3227a17b8414b9123b877b12d74b91603c046b0d96c9cc6fd0b504202c75b5a"
+  },
+  "variants": [
+    {
+      "schema_version": 1,
+      "component_version": "0.1.0.dev0",
+      "artifact_version": "0.1.0.dev0+pt.2.12.0.post3",
+      "pta_version": "2.12.0.post3",
+      "torch_version": "2.12.0+cpu",
+      "op_plugin_version": "V2R12",
+      "torch_commit": "7661cd9c6b841b62b7f411aa52ec51f05457263b",
+      "torch_cxx11_abi": true,
+      "python_abi": "cp311",
+      "host_arch": "aarch64",
+      "soc_list": [
+        "ascend950"
+      ],
+      "cann_root": "/home/xh/CANN/cann-1008/Ascend/cann-9.2.0",
+      "cann_version": "9.2.0",
+      "cann_version_info": "Version=9.2.0\nversion_dir=cann\nrequired_package_runtime_version=\">=8.5\"\nrequired_package_ge-executor_version=\">=8.5\"\nrequired_package_metadef_version=\">=8.5\"\nrequired_package_asc-devkit_version=\">=8.5\"\nrequired_package_bisheng-compiler_version=\">=8.5\"\ntimestamp=20261008_120344816\n",
+      "cann_version_sha256": "0563f1509a838c54d1692c022a0ee18d7ffee5abf6a726c4410d589b95a42fb4",
+      "dependency_lock_sha256": "6688d41bdbf0e085e3f69bc9c10729bfed0d460f045e601d6d94223bf0a37ca9",
+      "build_commit": "fd8131f24512ccf0764b277460630e7d2b8cb0fd",
+      "source_sha256": "30a3b1fb9cb5f92f2b5cdf2f64a07445aeb73a1a6dd6552b1f0ecaba9ab67aed",
+      "framework_locations": {
+        "torch": "/home/h00875090/miniconda3/envs/megamoe_a5_py311_torch212/lib/python3.11/site-packages/torch",
+        "torch_npu": "/home/h00875090/miniconda3/envs/megamoe_a5_py311_torch212/lib/python3.11/site-packages/torch_npu"
+      },
+      "build_fingerprint": "568df3012d33d77ce3b3a91373ebfcd5d7dbf7ce6dff497792912857bc629693",
+      "torch_release": "2.12.0",
+      "pta_release": "2.12.0",
+      "torch_so": "adapters/pt2.12.0.post3-568df3012d33/libhyper_multicore_torch.so",
+      "shmem_so": "adapters/pt2.12.0.post3-568df3012d33/hyper_multicore_shmem_torch.so",
+      "id": "pt2.12.0.post3-568df3012d33",
+      "native_build_identity": {
+        "build_commit": "fd8131f24512ccf0764b277460630e7d2b8cb0fd",
+        "source_sha256": "30a3b1fb9cb5f92f2b5cdf2f64a07445aeb73a1a6dd6552b1f0ecaba9ab67aed",
+        "build_fingerprint": "568df3012d33d77ce3b3a91373ebfcd5d7dbf7ce6dff497792912857bc629693"
+      }
+    }
+  ]
+}

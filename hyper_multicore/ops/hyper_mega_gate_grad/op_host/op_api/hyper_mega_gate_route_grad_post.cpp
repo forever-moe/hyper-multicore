@@ -20,6 +20,7 @@ OP_TYPE_REGISTER(ScatterElementsV2);
 OP_TYPE_REGISTER(SoftplusV2Grad);
 OP_TYPE_REGISTER(Muls);
 OP_TYPE_REGISTER(RealDiv);
+OP_TYPE_REGISTER(SigmoidGrad);
 
 namespace {
 
@@ -140,6 +141,20 @@ const aclTensor *HyperMegaGateSoftplusV2Grad(const aclTensor *sqrt_input_grad, c
   CHECK_RET(result != nullptr, nullptr);
   const auto status = ADD_TO_LAUNCHER_LIST_AICORE(SoftplusV2Grad, OP_INPUT(sqrt_input_grad_matrix, logits_matrix),
                                                   OP_OUTPUT(result), OP_ATTR(1.0F, 20.0F));
+  CHECK_RET(status == ACLNN_SUCCESS, nullptr);
+  return result;
+}
+
+const aclTensor *HyperMegaGateSigmoidGrad(const aclTensor *score_grad, const aclTensor *route_scores,
+                                         const aclTensor *output, aclOpExecutor *executor) {
+  CHECK_RET(score_grad != nullptr && route_scores != nullptr && executor != nullptr, nullptr);
+  const auto *grad_matrix = EnsureKernelTensorMetadata(score_grad, executor);
+  const auto *score_matrix = EnsureKernelTensorMetadata(route_scores, executor);
+  CHECK_RET(grad_matrix != nullptr && score_matrix != nullptr, nullptr);
+  auto *result = ResolveOutput(grad_matrix, output, executor);
+  CHECK_RET(result != nullptr, nullptr);
+  // CANN preserves (grad * (1 - score)) * score, including rounding and signed zero.
+  const auto status = ADD_TO_LAUNCHER_LIST_AICORE(SigmoidGrad, OP_INPUT(score_matrix, grad_matrix), OP_OUTPUT(result));
   CHECK_RET(status == ACLNN_SUCCESS, nullptr);
   return result;
 }

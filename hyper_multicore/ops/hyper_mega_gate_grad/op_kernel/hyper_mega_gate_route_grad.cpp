@@ -39,17 +39,17 @@ class RouteGradWorker : public MulticoreRuntime::AivPipelineWorkerBase<RouteGrad
                               __gm__ float *selected_score_grad, __gm__ float *zero_score_grad, GM_ADDR workspace,
                               const HyperMegaGateRouteGradTilingData &tiling) {
     MulticoreRuntime::AivPipelineWorkerBase<RouteGradWorker>::Init(worker_id, runtime_config, diagnostic_buffer);
-    top_k_ = tiling.topK;
+    stage_count_ = tiling.stageCount;
     pipeline_.Init(worker_id, selected_scores, denominator, grad_weights, selected_score_grad, zero_score_grad,
                    workspace, tiling);
   }
 
   __aicore__ inline void ExecuteComputeKernel(MulticoreRuntime::TaskType task_type, uint32_t stage_id) {
-    const uint32_t stage_count = top_k_ == 1 ? kOneStageCount : kGreaterOneStageCount;
-    if (stage_id >= stage_count) {
+    if (stage_id >= stage_count_) {
       Trap();
     }
-    const MulticoreRuntime::TaskType expected = top_k_ == 1 ? kOneStages[stage_id] : kGreaterOneStages[stage_id];
+    const MulticoreRuntime::TaskType expected =
+      stage_count_ == kOneStageCount ? kOneStages[stage_id] : kGreaterOneStages[stage_id];
     if (task_type != expected) {
       Trap();
     }
@@ -99,7 +99,7 @@ class RouteGradWorker : public MulticoreRuntime::AivPipelineWorkerBase<RouteGrad
 
  private:
   HyperMegaGate::RouteGradPipeline pipeline_;
-  uint32_t top_k_ = 0;
+  uint32_t stage_count_ = 0;
 };
 
 }  // namespace
@@ -118,7 +118,8 @@ extern "C" __global__ __aicore__ void hyper_mega_gate_route_grad(
   GET_TILING_DATA(tiling_data, tiling);
   const uint32_t worker_id = GetBlockIdx();
   auto *runtime = reinterpret_cast<__gm__ uint8_t *>(runtime_config);
-  const uint32_t expected_stages = tiling_data.topK == 1 ? kOneStageCount : kGreaterOneStageCount;
+  const uint32_t expected_stages = tiling_data.topK == 1 || tiling_data.normalize == 0
+                                     ? kOneStageCount : kGreaterOneStageCount;
   if (worker_id >= tiling_data.activeAivWorkerCount || tiling_data.stageCount != expected_stages ||
       !IsRouteGradRuntimeValid(runtime, tiling_data)) {
     Trap();

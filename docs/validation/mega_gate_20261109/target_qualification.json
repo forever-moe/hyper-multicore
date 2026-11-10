@@ -1,0 +1,10 @@
+{
+  "implementation": "/home/w00504392/code/hyper-multicore/hyper_multicore/modules/mega_gate/__init__.py",
+  "torch": "2.12.0+cpu",
+  "torch_npu": "2.12.0.post3",
+  "device": "Ascend950PR_9589",
+  "fixture_sha256": "f55b953d9ad15edfe344bc8528ecd27a6efae2e10cb89ef26ee971179e09ebba",
+  "rounds": 9,
+  "iterations": 100,
+  "harness_sha256": "80d62391bbf691871829f6f30ec915a1b46734c4b30dbeb7e9c5d5cede130b45"
+}

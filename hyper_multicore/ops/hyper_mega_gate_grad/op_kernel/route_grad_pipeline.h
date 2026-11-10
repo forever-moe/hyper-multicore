@@ -122,6 +122,7 @@ class RouteGradPipeline : private TokenRowPipeline {
     row_sum_ = reinterpret_cast<__gm__ float *>(base + tiling.rowSumOffset);
     expert_count_ = tiling.expertCount;
     top_k_ = tiling.topK;
+    normalize_ = tiling.normalize != 0;
     expert_align_ = tiling.expertAlign;
     k_align_ = tiling.kAlign;
     shared_tmp_bytes_ = tiling.sharedTmpBytes;
@@ -136,7 +137,7 @@ class RouteGradPipeline : private TokenRowPipeline {
   }
 
   __aicore__ inline void MulsScaleGrad() {
-    if (top_k_ == 1) {
+    if (top_k_ == 1 || !normalize_) {
       RunUnaryMuls(grad_weights_, selected_score_grad_, scaling_);
       return;
     }
@@ -313,8 +314,8 @@ class RouteGradPipeline : private TokenRowPipeline {
         Mul(destination, left_value, right_value, element_count);
       } else {
 #if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
-        // Normalization gradients require the same FP32 rounding as the reference Div operations.
-        static constexpr DivConfig div_config = {DivAlgo::PRECISION_0ULP_FTZ_FALSE};
+        // Match CANN RealDiv rather than changing its FTZ or NaN behavior.
+        static constexpr DivConfig div_config = {DivAlgo::DIFF_COMPENSATION};
         Div<float, div_config>(destination, left_value, right_value, element_count);
 #else
         Div(destination, left_value, right_value, element_count);
@@ -383,6 +384,7 @@ class RouteGradPipeline : private TokenRowPipeline {
   uint32_t k_align_ = 0;
   uint32_t shared_tmp_bytes_ = 0;
   float scaling_ = 1.0F;
+  bool normalize_ = true;
 };
 
 }  // namespace HyperMegaGate

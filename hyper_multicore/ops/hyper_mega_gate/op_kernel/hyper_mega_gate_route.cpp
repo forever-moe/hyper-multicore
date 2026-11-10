@@ -28,7 +28,8 @@ class RoutePipelineWorker : public MulticoreRuntime::AivPipelineWorkerBase<Route
                 tiling_data.expertCount, tiling_data.topK, tiling_data.routedScalingFactor, tiling_data.batchRows,
                 tiling_data.expertAlign, tiling_data.kAlign, tiling_data.sharedTmpBytes, tiling_data.scoreAOffset,
                 tiling_data.topkValuesOffset, tiling_data.indicesI32Offset, tiling_data.rowSumOffset,
-                &tiling_data.topkTiling, first_row, row_count);
+                &tiling_data.topkTiling, first_row, row_count, tiling_data.useSigmoid != 0,
+                tiling_data.normalize != 0, tiling_data.useBias != 0);
   }
 
   __aicore__ inline void ExecuteComputeKernel(MulticoreRuntime::TaskType task_type, uint32_t tiling_offset) {

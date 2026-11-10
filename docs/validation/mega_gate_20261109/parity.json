@@ -1,0 +1,910 @@
+{
+  "passed": true,
+  "groups": 25,
+  "tensors": 106,
+  "results": {
+    "route/0/0": {
+      "equal": true,
+      "shape": [
+        1,
+        1
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/0/1": {
+      "equal": true,
+      "shape": [
+        1,
+        1
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/0/2": {
+      "equal": true,
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/1/0": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/1/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/1/2": {
+      "equal": true,
+      "shape": [
+        33,
+        12
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "route/2/0": {
+      "equal": true,
+      "shape": [
+        65,
+        16
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/2/1": {
+      "equal": true,
+      "shape": [
+        65,
+        16
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/2/2": {
+      "equal": true,
+      "shape": [
+        65,
+        64
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/3/0": {
+      "equal": true,
+      "shape": [
+        257,
+        128
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/3/1": {
+      "equal": true,
+      "shape": [
+        257,
+        128
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/3/2": {
+      "equal": true,
+      "shape": [
+        257,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/4/0": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/4/1": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/4/2": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/5/0": {
+      "equal": true,
+      "shape": [
+        65,
+        3
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/5/1": {
+      "equal": true,
+      "shape": [
+        65,
+        3
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/5/2": {
+      "equal": true,
+      "shape": [
+        65,
+        12
+      ],
+      "dtype": "torch.float16"
+    },
+    "route/6/0": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/6/1": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/6/2": {
+      "equal": true,
+      "shape": [
+        33,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/7/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "route/7/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "route/7/2": {
+      "equal": true,
+      "shape": [
+        4096,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/0/0": {
+      "equal": true,
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/0/1": {
+      "equal": true,
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/0/2": {
+      "equal": true,
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/0/3": {
+      "equal": true,
+      "shape": [
+        1,
+        64
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/0/4": {
+      "equal": true,
+      "shape": [
+        8,
+        64
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/1/0": {
+      "equal": true,
+      "shape": [
+        31,
+        12
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/1/1": {
+      "equal": true,
+      "shape": [
+        31,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/1/2": {
+      "equal": true,
+      "shape": [
+        31,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/1/3": {
+      "equal": true,
+      "shape": [
+        31,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/1/4": {
+      "equal": true,
+      "shape": [
+        12,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/1/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "projection/2/0": {
+      "equal": true,
+      "shape": [
+        32,
+        16
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/2/1": {
+      "equal": true,
+      "shape": [
+        32,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/2/2": {
+      "equal": true,
+      "shape": [
+        32,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/2/3": {
+      "equal": true,
+      "shape": [
+        32,
+        128
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/2/4": {
+      "equal": true,
+      "shape": [
+        16,
+        128
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/3/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/3/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/3/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/3/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/3/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/3/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "projection/4/0": {
+      "equal": true,
+      "shape": [
+        129,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/4/1": {
+      "equal": true,
+      "shape": [
+        129,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/4/2": {
+      "equal": true,
+      "shape": [
+        129,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/4/3": {
+      "equal": true,
+      "shape": [
+        129,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/4/4": {
+      "equal": true,
+      "shape": [
+        384,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/4/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "projection/5/0": {
+      "equal": true,
+      "shape": [
+        4096,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/5/1": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/5/2": {
+      "equal": true,
+      "shape": [
+        4096,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/5/3": {
+      "equal": true,
+      "shape": [
+        4096,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/5/4": {
+      "equal": true,
+      "shape": [
+        384,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/5/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "projection/6/0": {
+      "equal": true,
+      "shape": [
+        6144,
+        384
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/6/1": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "projection/6/2": {
+      "equal": true,
+      "shape": [
+        6144,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "projection/6/3": {
+      "equal": true,
+      "shape": [
+        6144,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/6/4": {
+      "equal": true,
+      "shape": [
+        384,
+        5120
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "projection/6/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "branch/logits/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "branch/logits/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "branch/logits/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "branch/logits/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "branch/logits/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "branch/logits/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "branch/weights/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "branch/weights/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "branch/weights/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "branch/weights/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "branch/weights/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "branch/weights/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "frozen/x/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "frozen/x/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "frozen/x/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "frozen/x/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "frozen/x/4": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "frozen/w/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "frozen/w/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "frozen/w/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "frozen/w/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "frozen/w/4": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "checkpoint/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "checkpoint/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "checkpoint/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "checkpoint/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "checkpoint/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "checkpoint/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "autocast_hf32/False/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "autocast_hf32/False/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "autocast_hf32/False/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "autocast_hf32/False/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "autocast_hf32/False/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "autocast_hf32/False/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "autocast_hf32/True/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "autocast_hf32/True/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "autocast_hf32/True/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "autocast_hf32/True/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "autocast_hf32/True/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "autocast_hf32/True/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "stream/0/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "stream/0/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "stream/0/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "stream/0/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "stream/0/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "stream/0/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "stream/1/0": {
+      "equal": true,
+      "shape": [
+        33,
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "stream/1/1": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.float32"
+    },
+    "stream/1/2": {
+      "equal": true,
+      "shape": [
+        33,
+        8
+      ],
+      "dtype": "torch.int64"
+    },
+    "stream/1/3": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "stream/1/4": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.bfloat16"
+    },
+    "stream/1/5": {
+      "equal": true,
+      "kind": "unused_gradient"
+    },
+    "training/0": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.float32"
+    },
+    "training/1": {
+      "equal": true,
+      "shape": [
+        33
+      ],
+      "dtype": "torch.float32"
+    },
+    "training/2": {
+      "equal": true,
+      "shape": [
+        33,
+        128
+      ],
+      "dtype": "torch.float32"
+    },
+    "training/3": {
+      "equal": true,
+      "shape": [
+        12,
+        2
+      ],
+      "dtype": "torch.float32"
+    }
+  }
+}

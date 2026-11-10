@@ -26,6 +26,9 @@ REG_OP(HyperMegaGateRoute)
   .REQUIRED_ATTR(top_k, Int)
   .REQUIRED_ATTR(routed_scaling_factor, Float)
   .REQUIRED_ATTR(use_vision_bias, Bool)
+  .ATTR(use_sigmoid, Bool, false)
+  .ATTR(normalize, Bool, true)
+  .ATTR(use_bias, Bool, true)
   .OP_END_FACTORY_REG(HyperMegaGateRoute)
 
 }  // namespace ge

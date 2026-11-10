@@ -20,7 +20,6 @@
 namespace optiling {
 namespace {
 
-constexpr uint32_t kAivWorkerSlotCapacity = 48;
 constexpr uint32_t kGreaterOneStageCount = 11;
 constexpr uint32_t kOneStageCount = 2;
 constexpr uint32_t kFp32Alignment = 8;
@@ -73,7 +72,7 @@ bool GetWorkerLayout(gert::TilingContext *context, uint32_t tokens, WorkerLayout
   if (layout.available_workers == 0) {
     return false;
   }
-  const uint32_t worker_capacity = std::min({tokens, layout.available_workers, kAivWorkerSlotCapacity});
+  const uint32_t worker_capacity = std::min(tokens, layout.available_workers);
   layout.rows_per_worker = CeilDiv(tokens, worker_capacity);
   layout.active_workers = CeilDiv(tokens, layout.rows_per_worker);
   platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, layout.ub_bytes);
@@ -118,9 +117,8 @@ uint64_t RequiredUbBytes(uint32_t rows, uint32_t experts_align, uint32_t k_align
   return kUbReserveBytes + std::max({k_binary, zero, broadcast, reduce});
 }
 
-bool SelectBatchRows(gert::TilingContext *context, const WorkerLayout &workers, uint32_t experts_align, uint32_t k,
+bool SelectBatchRows(gert::TilingContext *context, const WorkerLayout &workers, uint32_t experts_align, bool normalized,
                      uint32_t k_align, uint32_t &batch_rows, uint32_t &shared_tmp_bytes) {
-  const bool normalized = k > 1;
   for (uint32_t candidate = workers.rows_per_worker; candidate > 0; --candidate) {
     uint32_t candidate_tmp = 32;
     if (normalized && !QuerySharedTmpBytes(context, candidate, k_align, candidate_tmp)) {
@@ -140,6 +138,7 @@ struct RouteGradInputs {
   uint32_t experts;
   uint32_t top_k;
   float scaling;
+  bool normalize;
   uint64_t runtime_bytes;
   uint64_t profile_bytes;
 };
@@ -196,9 +195,28 @@ ge::graphStatus ParseInputs(gert::TilingContext *context, RouteGradInputs &input
   inputs.experts = static_cast<uint32_t>(scores.GetDim(1));
   inputs.top_k = static_cast<uint32_t>(*top_k);
   inputs.scaling = *scaling;
+  const auto *normalize = attrs->GetAttrPointer<bool>(2);
+  OP_CHECK_NULL_WITH_CONTEXT(context, normalize);
+  inputs.normalize = *normalize;
   inputs.runtime_bytes = ElementCount(runtime_shape->GetStorageShape());
   inputs.profile_bytes = ElementCount(profile_shape->GetStorageShape());
   return ge::GRAPH_SUCCESS;
+}
+
+bool ReserveRouteGradWorkspace(uint32_t tokens, uint32_t k, bool normalized, uint64_t &workspace_bytes,
+                                uint64_t (&offsets)[9]) {
+  if (normalized) {
+    const uint64_t k_tensor_bytes = static_cast<uint64_t>(tokens) * k * sizeof(float);
+    for (uint32_t index = 0; index < 8; ++index) {
+      if (!ReserveWorkspace(k_tensor_bytes, workspace_bytes, offsets[index])) {
+        return false;
+      }
+    }
+    if (!ReserveWorkspace(static_cast<uint64_t>(tokens) * sizeof(float), workspace_bytes, offsets[8])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 ge::graphStatus TilingRouteGrad(gert::TilingContext *context) {
@@ -218,23 +236,16 @@ ge::graphStatus TilingRouteGrad(gert::TilingContext *context) {
   }
   uint32_t batch_rows = 0;
   uint32_t shared_tmp_bytes = 0;
-  if (!SelectBatchRows(context, workers, expert_align, k, k_align, batch_rows, shared_tmp_bytes)) {
+  const bool normalized = k > 1 && inputs.normalize;
+  if (!SelectBatchRows(context, workers, expert_align, normalized, k_align, batch_rows, shared_tmp_bytes)) {
     OP_LOGE(context->GetNodeName(), "No legal HyperMegaGateRouteGrad UB layout.");
     return ge::GRAPH_FAILED;
   }
 
   uint64_t workspace_bytes = 0;
   uint64_t offsets[9]{};
-  if (k > 1) {
-    const uint64_t k_tensor_bytes = static_cast<uint64_t>(tokens) * k * sizeof(float);
-    for (uint32_t index = 0; index < 8; ++index) {
-      if (!ReserveWorkspace(k_tensor_bytes, workspace_bytes, offsets[index])) {
-        return ge::GRAPH_FAILED;
-      }
-    }
-    if (!ReserveWorkspace(static_cast<uint64_t>(tokens) * sizeof(float), workspace_bytes, offsets[8])) {
-      return ge::GRAPH_FAILED;
-    }
+  if (!ReserveRouteGradWorkspace(tokens, k, normalized, workspace_bytes, offsets)) {
+    return ge::GRAPH_FAILED;
   }
 
   HyperMegaGateRouteGradTilingData tiling;
@@ -242,10 +253,11 @@ ge::graphStatus TilingRouteGrad(gert::TilingContext *context) {
   tiling.set_expertCount(experts);
   tiling.set_topK(k);
   tiling.set_routedScalingFactor(inputs.scaling);
-  tiling.set_stageCount(k == 1 ? kOneStageCount : kGreaterOneStageCount);
+  tiling.set_stageCount(k == 1 || !inputs.normalize ? kOneStageCount : kGreaterOneStageCount);
+  tiling.set_normalize(inputs.normalize ? 1U : 0U);
   tiling.set_activeAivWorkerCount(workers.active_workers);
   tiling.set_rowsPerWorker(workers.rows_per_worker);
-  tiling.set_aivWorkerSlotCapacity(kAivWorkerSlotCapacity);
+  tiling.set_aivWorkerSlotCapacity(workers.available_workers);
   tiling.set_batchRows(batch_rows);
   tiling.set_expertAlign(expert_align);
   tiling.set_kAlign(k_align);

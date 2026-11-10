@@ -34,20 +34,19 @@ bool AreTypesValid(const aclTensor *logits, const aclTensor *route_scores, const
          expert_indices->GetDataType() == op::DataType::DT_INT64 && IsFp32(grad_routing_weights) && IsFp32(grad_logits);
 }
 
+bool IsSupportedNormalization(bool use_sigmoid, bool normalize, int64_t top_k) {
+  return !use_sigmoid || !normalize || top_k <= 8 || top_k == 16 || top_k == 128 || top_k == 384;
+}
+
 }  // namespace
 
-extern "C" {
-
-aclnnStatus aclnnHyperMegaGateRouteGradGetWorkspaceSize(
+static aclnnStatus PrepareRouteGrad(
   const aclTensor *logits, const aclTensor *route_scores, const aclTensor *selected_scores,
   const aclTensor *normalization_denominator, const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
   const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *grad_logits, int64_t top_k,
-  double routed_scaling_factor, uint64_t *workspaceSize, aclOpExecutor **executor) {
+  double routed_scaling_factor, uint64_t *workspaceSize, aclOpExecutor **executor,
+  bool use_sigmoid, bool normalize) {
   OP_CHECK_COMM_INPUT(workspaceSize, executor);
-  L2_DFX_PHASE_1(aclnnHyperMegaGateRouteGrad,
-                 DFX_IN(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
-                        grad_routing_weights, runtime_config, diagnostic_buffer, top_k, routed_scaling_factor),
-                 DFX_OUT(grad_logits));
   CHECK_RET(logits != nullptr && logits->GetViewShape().GetDimNum() == 2, ACLNN_ERR_PARAM_INVALID);
   const int64_t tokens = logits->GetViewShape().GetDim(0);
   const int64_t expert_count = logits->GetViewShape().GetDim(1);
@@ -61,16 +60,55 @@ aclnnStatus aclnnHyperMegaGateRouteGradGetWorkspaceSize(
   CHECK_RET(AreTypesValid(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
                           grad_routing_weights, grad_logits),
             ACLNN_ERR_PARAM_INVALID);
+  CHECK_RET(IsSupportedNormalization(use_sigmoid, normalize, top_k),
+            ACLNN_ERR_PARAM_INVALID);
   auto unique_executor = CREATE_EXECUTOR();
   auto *executor_ptr = unique_executor.get();
   CHECK_RET(executor_ptr != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
   const auto *result = l0op::HyperMegaGateRouteGrad(
     logits, route_scores, selected_scores, normalization_denominator, expert_indices, grad_routing_weights,
-    runtime_config, diagnostic_buffer, top_k, static_cast<float>(routed_scaling_factor), grad_logits, executor_ptr);
+    runtime_config, diagnostic_buffer, top_k, static_cast<float>(routed_scaling_factor), grad_logits,
+    executor_ptr, use_sigmoid, normalize);
   CHECK_RET(result != nullptr, ACLNN_ERR_INNER_NULLPTR);
   *workspaceSize = unique_executor->GetWorkspaceSize();
   unique_executor.ReleaseTo(executor);
   return ACLNN_SUCCESS;
+}
+
+extern "C" {
+
+aclnnStatus aclnnHyperMegaGateRouteGradGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *grad_logits, int64_t top_k,
+  double routed_scaling_factor, uint64_t *workspaceSize, aclOpExecutor **executor) {
+  L2_DFX_PHASE_1(aclnnHyperMegaGateRouteGrad,
+                 DFX_IN(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
+                        grad_routing_weights, runtime_config, diagnostic_buffer, top_k, routed_scaling_factor),
+                 DFX_OUT(grad_logits));
+  return PrepareRouteGrad(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
+                          grad_routing_weights, runtime_config, diagnostic_buffer, grad_logits, top_k,
+                          routed_scaling_factor, workspaceSize, executor, false, true);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRouteGradGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, const aclTensor *expert_indices, const aclTensor *grad_routing_weights,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *grad_logits, int64_t top_k,
+  bool normalize, uint64_t *workspaceSize, aclOpExecutor **executor) {
+  L2_DFX_PHASE_1(aclnnHyperMegaGateSigmoidRouteGrad,
+                 DFX_IN(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
+                        grad_routing_weights, runtime_config, diagnostic_buffer, top_k, normalize),
+                 DFX_OUT(grad_logits));
+  return PrepareRouteGrad(logits, route_scores, selected_scores, normalization_denominator, expert_indices,
+                          grad_routing_weights, runtime_config, diagnostic_buffer, grad_logits, top_k,
+                          1.0, workspaceSize, executor, true, normalize);
+}
+
+aclnnStatus aclnnHyperMegaGateSigmoidRouteGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                             aclrtStream stream) {
+  L2_DFX_PHASE_2(aclnnHyperMegaGateSigmoidRouteGrad);
+  return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
 aclnnStatus aclnnHyperMegaGateRouteGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,

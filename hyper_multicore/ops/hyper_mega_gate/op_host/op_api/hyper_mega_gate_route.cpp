@@ -55,7 +55,7 @@ const std::array<const aclTensor *, 5> HyperMegaGateRoute(
   const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
   const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
   const aclTensor *normalization_denominator, int64_t top_k, float routed_scaling_factor, bool use_vision_bias,
-  aclOpExecutor *executor) {
+  aclOpExecutor *executor, bool use_sigmoid, bool normalize, bool use_bias) {
   L0_DFX(HyperMegaGateRoute, logits, text_bias, vision_bias, image_mask, runtime_config, diagnostic_buffer,
          routing_weights, expert_indices, route_scores, selected_scores, normalization_denominator, top_k,
          routed_scaling_factor, use_vision_bias);
@@ -73,7 +73,7 @@ const std::array<const aclTensor *, 5> HyperMegaGateRoute(
     HyperMegaGateRoute,
     OP_INPUT(kernel_logits, text_bias, vision_bias, kernel_image_mask, runtime_config, diagnostic_buffer),
     OP_OUTPUT(weights_out, indices_out, route_scores_out, selected_scores_out, denominator_out),
-    OP_ATTR(top_k, routed_scaling_factor, use_vision_bias));
+    OP_ATTR(top_k, routed_scaling_factor, use_vision_bias, use_sigmoid, normalize, use_bias));
   if (status != ACLNN_SUCCESS) {
     return {nullptr, nullptr, nullptr, nullptr, nullptr};
   }

@@ -19,6 +19,7 @@ set(MHC_HOST ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_mhc/op_host)
 set(MHC_GRAD_HOST ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_mhc_grad/op_host)
 set(GATE_HOST ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_gate/op_host)
 set(GATE_GRAD_HOST ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_gate_grad/op_host)
+set(GATE_PROJECTION_HOST ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_gate_projection/op_host)
 set(CANN_PACKAGE_ARCH_ROOT ${ASCEND_CANN_PACKAGE_PATH})
 string(APPEND CANN_PACKAGE_ARCH_ROOT "/${CMAKE_SYSTEM_PROCESSOR}-linux")
 set(MHC_GRAD_TILING
@@ -70,6 +71,11 @@ set(OP_TILING_SOURCES
     ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_moe_mxfp8_grad/op_host/hyper_mega_moe_mxfp8_grad_tiling.cpp
 )
 
+if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+    list(APPEND OP_SCHEMA_SOURCES ${GATE_PROJECTION_HOST}/hyper_mega_gate_projection.cpp)
+    list(APPEND OP_TILING_SOURCES ${GATE_PROJECTION_HOST}/hyper_mega_gate_projection_tiling.cpp)
+endif()
+
 npu_op_code_gen(
     SRC ${OP_SCHEMA_SOURCES}
     PACKAGE ${package_name}
@@ -98,6 +104,9 @@ set(ACLNN_SOURCES
     ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_moe_mxfp8/op_host/op_api/hyper_mega_moe_mxfp8.cpp
     ${HP_MULTICORE_SOURCE_ROOT}/hyper_mega_moe_mxfp8_grad/op_host/op_api/hyper_mega_moe_mxfp8_grad.cpp
 )
+if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+    list(APPEND ACLNN_SOURCES ${ASCEND_AUTOGEN_PATH}/aclnn_hyper_mega_gate_projection.cpp)
+endif()
 npu_op_library(cust_opapi ACLNN ${ACLNN_SOURCES})
 target_compile_options(cust_opapi PRIVATE -fvisibility=hidden)
 target_include_directories(cust_opapi PRIVATE
@@ -182,3 +191,9 @@ npu_op_package_add(${package_name}
         ${GATE_HOST}/op_api/aclnn_hyper_mega_gate_route.h
         ${GATE_GRAD_HOST}/op_api/aclnn_hyper_mega_gate_route_grad.h
 )
+if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+    npu_op_package_add(${package_name}
+        TYPE ACLNN
+        FILES ${ASCEND_AUTOGEN_PATH}/aclnn_hyper_mega_gate_projection.h
+    )
+endif()

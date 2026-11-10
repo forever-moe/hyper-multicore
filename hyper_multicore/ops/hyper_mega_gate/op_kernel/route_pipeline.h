@@ -13,8 +13,50 @@ namespace HyperMegaGate {
 
 using namespace AscendC;  // NOLINT(build/namespaces)
 
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+__simd_vf__ inline void AddTextBiasVF(__ubuf__ float *output, __ubuf__ float *input, __ubuf__ float *bias,
+                                      uint32_t rows, uint32_t row_stride, uint32_t columns) {
+  constexpr uint32_t lanes = VECTOR_REG_WIDTH / sizeof(float);
+  Reg::RegTensor<float> bias_value;
+  Reg::RegTensor<float> input_value;
+  Reg::RegTensor<float> output_value;
+  uint32_t remaining = columns;
+  const uint16_t repeats = static_cast<uint16_t>((columns + lanes - 1) / lanes);
+  for (uint16_t repeat = 0; repeat < repeats; ++repeat) {
+    Reg::MaskReg mask = Reg::UpdateMask<float>(remaining);
+    const uint32_t column = repeat * lanes;
+    Reg::LoadAlign(bias_value, bias + column);
+    for (uint32_t row = 0; row < rows; ++row) {
+      const uint32_t offset = row * row_stride + column;
+      Reg::LoadAlign(input_value, input + offset);
+      Reg::Add(output_value, input_value, bias_value, mask);
+      Reg::StoreAlign(output + offset, output_value, mask);
+    }
+  }
+}
+
+__simd_vf__ inline void GatherScoreVF(__ubuf__ float *output, __ubuf__ float *scores,
+                                      __ubuf__ uint32_t *indices, uint32_t rows, uint32_t score_stride,
+                                      uint32_t selected_stride, uint32_t top_k) {
+  constexpr uint32_t lanes = VECTOR_REG_WIDTH / sizeof(float);
+  const uint16_t repeats = static_cast<uint16_t>((top_k + lanes - 1) / lanes);
+  Reg::RegTensor<uint32_t> index_value;
+  Reg::RegTensor<float> selected_value;
+  for (uint32_t row = 0; row < rows; ++row) {
+    uint32_t remaining = top_k;
+    for (uint16_t repeat = 0; repeat < repeats; ++repeat) {
+      Reg::MaskReg mask = Reg::UpdateMask<float>(remaining);
+      const uint32_t offset = row * selected_stride + repeat * lanes;
+      Reg::LoadAlign(index_value, indices + offset);
+      Reg::Gather(selected_value, scores + row * score_stride, index_value, mask);
+      Reg::StoreAlign(output + offset, selected_value, mask);
+    }
+  }
+}
+#endif
+
 /**
- * @brief Execute one row shard of the ten-stage sqrt-softplus routing pipeline.
+ * @brief Execute one row shard of the ten-stage sigmoid or sqrt-softplus routing pipeline.
  *
  * The caller owns a fixed contiguous row range. Every stage reads and writes
  * only that range, so workers can execute the same descriptor stream without
@@ -31,8 +73,12 @@ class RoutePipeline {
                               int64_t top_k, float routed_scaling_factor, uint32_t batch_rows, uint32_t expert_align,
                               uint32_t k_align, uint32_t shared_tmp_bytes, uint64_t score_a_offset,
                               uint64_t topk_values_offset, uint64_t indices_i32_offset, uint64_t row_sum_offset,
-                              const TopkTiling *topk_tiling, uint64_t first_row, uint32_t row_count) {
+                              const TopkTiling *topk_tiling, uint64_t first_row, uint32_t row_count,
+                              bool use_sigmoid = false, bool normalize = true, bool use_bias = true) {
     logits_ = logits;
+    use_sigmoid_ = use_sigmoid;
+    normalize_ = normalize;
+    use_bias_ = !use_sigmoid || use_bias;
     text_bias_ = text_bias;
     vision_bias_ = vision_bias;
     image_mask_ = image_mask;
@@ -101,36 +147,40 @@ class RoutePipeline {
       LocalTensor<uint8_t> log1p_mask = log1p_mask_buffer.Get<uint8_t>();
       const uint32_t count = rows * expert_align_;
 
-      CompareScalar(high_mask, input, 20.0f, CMPMODE::GT, count);
-      PipeBarrier<PIPE_V>();
-      Mins(exp_value, input, 20.0f, count);
-      PipeBarrier<PIPE_V>();
-      Exp(exp_value, exp_value, count);
-      PipeBarrier<PIPE_V>();
-      Adds(temp, exp_value, 1.0f, count);
-      PipeBarrier<PIPE_V>();
-      CompareScalar(log1p_mask, temp, 1.0f, CMPMODE::EQ, count);
-      PipeBarrier<PIPE_V>();
-      Adds(temp, temp, -1.0f, count);
-      PipeBarrier<PIPE_V>();
-      Select(output, high_mask, input, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
-      PipeBarrier<PIPE_V>();
-      Adds(temp, temp, 1.0f, count);
-      PipeBarrier<PIPE_V>();
-      Log(temp, temp, count);
-      PipeBarrier<PIPE_V>();
-      // Match the compensated log1p order: log(u) * (exp(x) / (u - 1)).
-      // Dividing log(u) first can change rounding at BF16 gradient midpoints.
-      Div(output, exp_value, output, count);
-      PipeBarrier<PIPE_V>();
-      Mul(temp, temp, output, count);
-      PipeBarrier<PIPE_V>();
-      Select(temp, log1p_mask, exp_value, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
-      PipeBarrier<PIPE_V>();
-      Select(output, high_mask, input, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
+      if (use_sigmoid_) {
+        Sigmoid(output, input, count);
+      } else {
+        CompareScalar(high_mask, input, 20.0f, CMPMODE::GT, count);
+        PipeBarrier<PIPE_V>();
+        Mins(exp_value, input, 20.0f, count);
+        PipeBarrier<PIPE_V>();
+        Exp(exp_value, exp_value, count);
+        PipeBarrier<PIPE_V>();
+        Adds(temp, exp_value, 1.0f, count);
+        PipeBarrier<PIPE_V>();
+        CompareScalar(log1p_mask, temp, 1.0f, CMPMODE::EQ, count);
+        PipeBarrier<PIPE_V>();
+        Adds(temp, temp, -1.0f, count);
+        PipeBarrier<PIPE_V>();
+        Select(output, high_mask, input, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
+        PipeBarrier<PIPE_V>();
+        Adds(temp, temp, 1.0f, count);
+        PipeBarrier<PIPE_V>();
+        Log(temp, temp, count);
+        PipeBarrier<PIPE_V>();
+        // Match the compensated log1p order: log(u) * (exp(x) / (u - 1)).
+        // Dividing log(u) first can change rounding at BF16 gradient midpoints.
+        Div(output, exp_value, output, count);
+        PipeBarrier<PIPE_V>();
+        Mul(temp, temp, output, count);
+        PipeBarrier<PIPE_V>();
+        Select(temp, log1p_mask, exp_value, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
+        PipeBarrier<PIPE_V>();
+        Select(output, high_mask, input, temp, SELMODE::VSEL_TENSOR_TENSOR_MODE, count);
+      }
       output_queue.EnQue(output);
       output = output_queue.DeQue<float>();
-      CopyOutRows(score_a_, row, rows, expert_count_, expert_align_, output);
+      CopyOutRows(use_sigmoid_ ? route_scores_ : score_a_, row, rows, expert_count_, expert_align_, output);
       input_queue.FreeTensor(input);
       output_queue.FreeTensor(output);
     }
@@ -138,6 +188,9 @@ class RoutePipeline {
   }
 
   __aicore__ inline void SqrtScore() {
+    if (use_sigmoid_) {
+      return;
+    }
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> input_queue;
     TQue<QuePosition::VECOUT, 1> output_queue;
@@ -184,6 +237,9 @@ class RoutePipeline {
   }
 
   __aicore__ inline void AddBias() {
+    if (!use_bias_) {
+      return;
+    }
     if (use_vision_bias_) {
       AddVisionBias();
       return;
@@ -192,6 +248,12 @@ class RoutePipeline {
   }
 
   __aicore__ inline void AddTextBias() {
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+    if (use_sigmoid_) {
+      AddTextBiasRegisters();
+      return;
+    }
+#endif
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> input_queue;
     TQue<QuePosition::VECOUT, 1> output_queue;
@@ -226,6 +288,50 @@ class RoutePipeline {
     }
     FinishStage(pipe);
   }
+
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+  __aicore__ inline void AddTextBiasRegisters() {
+    TPipe pipe;
+    TQue<QuePosition::VECIN, 2> input_queue;
+    TQue<QuePosition::VECOUT, 2> output_queue;
+    TBuf<TPosition::VECCALC> bias_buffer;
+    const uint32_t count = batch_rows_ * expert_align_;
+    pipe.InitBuffer(input_queue, 2, count * sizeof(float));
+    pipe.InitBuffer(output_queue, 2, count * sizeof(float));
+    pipe.InitBuffer(bias_buffer, expert_align_ * sizeof(float));
+    LocalTensor<float> local_bias = bias_buffer.Get<float>();
+    CopyInVector(local_bias, text_bias_, expert_count_);
+    event_t bias_ready = static_cast<event_t>(pipe.FetchEventID(HardEvent::MTE2_V));
+    SetFlag<HardEvent::MTE2_V>(bias_ready);
+    WaitFlag<HardEvent::MTE2_V>(bias_ready);
+    LocalTensor<float> first = input_queue.AllocTensor<float>();
+    CopyInRows(first, route_scores_, first_row_, BatchRowCount(0), expert_count_, expert_align_);
+    input_queue.EnQue(first);
+    for (uint32_t offset = 0; offset < row_count_; offset += batch_rows_) {
+      const uint64_t row = first_row_ + offset;
+      const uint32_t rows = BatchRowCount(offset);
+      LocalTensor<float> input = input_queue.DeQue<float>();
+      const uint32_t next_offset = offset + batch_rows_;
+      if (next_offset < row_count_) {
+        LocalTensor<float> next = input_queue.AllocTensor<float>();
+        CopyInRows(next, route_scores_, first_row_ + next_offset, BatchRowCount(next_offset),
+                   expert_count_, expert_align_);
+        input_queue.EnQue(next);
+      }
+      LocalTensor<float> output = output_queue.AllocTensor<float>();
+      AddTextBiasVF(reinterpret_cast<__ubuf__ float *>(output.GetPhyAddr()),
+                    reinterpret_cast<__ubuf__ float *>(input.GetPhyAddr()),
+                    reinterpret_cast<__ubuf__ float *>(local_bias.GetPhyAddr()), rows, expert_align_,
+                    static_cast<uint32_t>(expert_count_));
+      output_queue.EnQue(output);
+      output = output_queue.DeQue<float>();
+      CopyOutRows(score_a_, row, rows, expert_count_, expert_align_, output);
+      input_queue.FreeTensor(input);
+      output_queue.FreeTensor(output);
+    }
+    FinishStage(pipe);
+  }
+#endif
 
   __aicore__ inline void AddVisionBias() {
     TPipe pipe;
@@ -284,19 +390,79 @@ class RoutePipeline {
     FinishStage(pipe);
   }
 
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+  __aicore__ inline void BatchedTopK(LocalTensor<float> input, LocalTensor<int32_t> one_dim,
+                                    LocalTensor<float> values, LocalTensor<int32_t> indices,
+                                    TBuf<TPosition::VECCALC> &sort_buffer,
+                                    TBuf<TPosition::VECCALC> &merge_buffer, uint32_t rows) {
+    LocalTensor<float> sorted = sort_buffer.Get<float>();
+    LocalTensor<float> merged = merge_buffer.Get<float>();
+    constexpr uint32_t lists_per_row = 12;
+    constexpr uint32_t candidates_per_row = lists_per_row * 8;
+    Sort32(sorted, input, one_dim.ReinterpretCast<uint32_t>(), rows * lists_per_row);
+    PipeBarrier<PIPE_V>();
+    // Each sorted 32-element list contributes at most K candidates to the global TopK.
+    DataCopyParams compact{static_cast<uint16_t>(rows * lists_per_row), 2, 6, 0};
+    DataCopy(merged, sorted, compact);
+    PipeBarrier<PIPE_V>();
+    const uint16_t first_lengths[4] = {8, 8, 8, 8};
+    uint32_t sorted_counts[4];
+    MrgSortSrcList<float> first_lists(merged, merged[16], merged[32], merged[48]);
+    MrgSort<float, false>(sorted, first_lists, first_lengths, sorted_counts, 0b1111, rows * 3);
+    PipeBarrier<PIPE_V>();
+    const uint16_t final_lengths[4] = {32, 32, 32, 0};
+    for (uint32_t row = 0; row < rows; ++row) {
+      const uint32_t pair_offset = row * candidates_per_row * 2;
+      MrgSortSrcList<float> final_lists(sorted[pair_offset], sorted[pair_offset + 64],
+                                       sorted[pair_offset + 128], sorted[pair_offset]);
+      MrgSort<float, false>(merged[pair_offset], final_lists, final_lengths, sorted_counts, 0b0111, 1);
+      PipeBarrier<PIPE_V>();
+      uint64_t reserved = 0;
+      GatherMaskParams gather_params{1, 1, 8, 0};
+      GatherMask(values[row * 8], merged[pair_offset], 1, true, 16, gather_params, reserved);
+      GatherMask(indices[row * 8], merged[pair_offset].ReinterpretCast<int32_t>(), 2, true, 16,
+                 gather_params, reserved);
+    }
+  }
+#endif
+
+  __aicore__ inline void InitTopKIndices(LocalTensor<int32_t> one_dim, bool batched_sort) {
+    ArithProgression(one_dim, 0, 1, expert_align_);
+    PipeBarrier<PIPE_V>();
+    if (batched_sort) {
+      for (uint32_t row = 1; row < batch_rows_; ++row) {
+        DataCopy(one_dim[row * expert_align_], one_dim, expert_align_);
+      }
+      PipeBarrier<PIPE_V>();
+    }
+  }
+
   __aicore__ inline void TopKScore() {
+    __gm__ float *selection_scores = use_bias_ ? score_a_ : route_scores_;
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> input_queue;
     TQue<QuePosition::VECOUT, 1> value_queue;
     TQue<QuePosition::VECOUT, 1> index_queue;
     TBuf<TPosition::VECCALC> one_dim_buffer;
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+    // Keep the specialization inside TASK_GATE_TOPK; row ownership and task boundaries remain runtime-owned.
+    const bool batched_sort = use_sigmoid_ && expert_count_ == 384 && top_k_ == 8;
+    TBuf<TPosition::VECCALC> sort_buffer;
+    TBuf<TPosition::VECCALC> merge_buffer;
+    if (batched_sort) {
+      pipe.InitBuffer(sort_buffer, 2 * batch_rows_ * expert_align_ * sizeof(float));
+      pipe.InitBuffer(merge_buffer, 2 * batch_rows_ * 96 * sizeof(float));
+    }
+#else
+    const bool batched_sort = false;
+#endif
     pipe.InitBuffer(input_queue, 1, batch_rows_ * expert_align_ * sizeof(float));
-    pipe.InitBuffer(one_dim_buffer, expert_align_ * sizeof(int32_t));
+    pipe.InitBuffer(one_dim_buffer,
+                    (batched_sort ? batch_rows_ : 1) * expert_align_ * sizeof(int32_t));
     pipe.InitBuffer(value_queue, 1, batch_rows_ * k_align_ * sizeof(float));
     pipe.InitBuffer(index_queue, 1, batch_rows_ * k_align_ * sizeof(int32_t));
     LocalTensor<int32_t> one_dim = one_dim_buffer.Get<int32_t>();
-    ArithProgression(one_dim, 0, 1, expert_align_);
-    PipeBarrier<PIPE_V>();
+    InitTopKIndices(one_dim, batched_sort);
     event_t padding_ready = static_cast<event_t>(0);
     union {
       uint32_t bits;
@@ -317,7 +483,7 @@ class RoutePipeline {
         // DMA overwrites the last partial 32-byte block, including prefilled lanes.
         // Explicit padding keeps it at -inf; the remaining 64-lane stride stays prefilled.
         GlobalTensor<float> source;
-        source.SetGlobalBuffer(score_a_);
+        source.SetGlobalBuffer(selection_scores);
         const uint32_t columns = static_cast<uint32_t>(expert_count_);
         const uint32_t block_columns = (columns + 7) / 8 * 8;
         DataCopyExtParams params{static_cast<uint16_t>(rows), static_cast<uint32_t>(columns * sizeof(float)), 0,
@@ -326,7 +492,7 @@ class RoutePipeline {
                                             negative_infinity.value};
         DataCopyPad(input, source[row * columns], params, padding);
       } else {
-        CopyInRows(input, score_a_, row, rows, expert_count_, expert_align_);
+        CopyInRows(input, selection_scores, row, rows, expert_count_, expert_align_);
       }
       input_queue.EnQue(input);
       input = input_queue.DeQue<float>();
@@ -337,13 +503,23 @@ class RoutePipeline {
       info.outter = rows;
       info.inner = expert_align_;
       info.n = static_cast<uint32_t>(expert_count_);
-      TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(values, indices, input, one_dim, finished,
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+      if (batched_sort) {
+        BatchedTopK(input, one_dim, values, indices, sort_buffer, merge_buffer, rows);
+      } else {
+#endif
+        TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(values, indices, input, one_dim, finished,
                                                             static_cast<uint32_t>(top_k_), *topk_tiling_, info, true);
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+      }
+#endif
       value_queue.EnQue(values);
       index_queue.EnQue(indices);
       values = value_queue.DeQue<float>();
       indices = index_queue.DeQue<int32_t>();
-      CopyOutRows(topk_values_, row, rows, top_k_, k_align_, values);
+      // Without selection bias, TopK values are the unbiased backward state.
+      // Keep them separate from the workspace later overwritten by Div.
+      CopyOutRows(use_bias_ ? topk_values_ : selected_scores_, row, rows, top_k_, k_align_, values);
       CopyOutRows(indices_i32_, row, rows, top_k_, k_align_, indices);
       input_queue.FreeTensor(input);
       value_queue.FreeTensor(values);
@@ -353,6 +529,15 @@ class RoutePipeline {
   }
 
   __aicore__ inline void GatherScore() {
+    if (!use_bias_) {
+      return;
+    }
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+    if (use_sigmoid_) {
+      GatherScoreRegisters();
+      return;
+    }
+#endif
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> score_queue;
     TQue<QuePosition::VECIN, 1> index_queue;
@@ -436,6 +621,52 @@ class RoutePipeline {
     FinishStage(pipe);
   }
 
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+  __aicore__ inline void GatherScoreRegisters() {
+    TPipe pipe;
+    TQue<QuePosition::VECIN, 2> score_queue;
+    TQue<QuePosition::VECIN, 2> index_queue;
+    TQue<QuePosition::VECOUT, 2> output_queue;
+    pipe.InitBuffer(score_queue, 2, batch_rows_ * expert_align_ * sizeof(float));
+    pipe.InitBuffer(index_queue, 2, batch_rows_ * k_align_ * sizeof(int32_t));
+    pipe.InitBuffer(output_queue, 2, batch_rows_ * k_align_ * sizeof(float));
+    LocalTensor<float> first_scores = score_queue.AllocTensor<float>();
+    LocalTensor<int32_t> first_indices = index_queue.AllocTensor<int32_t>();
+    CopyInRows(first_scores, route_scores_, first_row_, BatchRowCount(0), expert_count_, expert_align_);
+    CopyInRows(first_indices, indices_i32_, first_row_, BatchRowCount(0), top_k_, k_align_);
+    score_queue.EnQue(first_scores);
+    index_queue.EnQue(first_indices);
+    for (uint32_t offset = 0; offset < row_count_; offset += batch_rows_) {
+      const uint64_t row = first_row_ + offset;
+      const uint32_t rows = BatchRowCount(offset);
+      LocalTensor<float> scores = score_queue.DeQue<float>();
+      LocalTensor<int32_t> indices = index_queue.DeQue<int32_t>();
+      const uint32_t next_offset = offset + batch_rows_;
+      if (next_offset < row_count_) {
+        LocalTensor<float> next_scores = score_queue.AllocTensor<float>();
+        LocalTensor<int32_t> next_indices = index_queue.AllocTensor<int32_t>();
+        CopyInRows(next_scores, route_scores_, first_row_ + next_offset, BatchRowCount(next_offset),
+                   expert_count_, expert_align_);
+        CopyInRows(next_indices, indices_i32_, first_row_ + next_offset, BatchRowCount(next_offset), top_k_, k_align_);
+        score_queue.EnQue(next_scores);
+        index_queue.EnQue(next_indices);
+      }
+      LocalTensor<float> selected = output_queue.AllocTensor<float>();
+      GatherScoreVF(reinterpret_cast<__ubuf__ float *>(selected.GetPhyAddr()),
+                    reinterpret_cast<__ubuf__ float *>(scores.GetPhyAddr()),
+                    reinterpret_cast<__ubuf__ uint32_t *>(indices.GetPhyAddr()), rows, expert_align_, k_align_,
+                    static_cast<uint32_t>(top_k_));
+      output_queue.EnQue(selected);
+      selected = output_queue.DeQue<float>();
+      CopyOutRows(selected_scores_, row, rows, top_k_, k_align_, selected);
+      score_queue.FreeTensor(scores);
+      index_queue.FreeTensor(indices);
+      output_queue.FreeTensor(selected);
+    }
+    FinishStage(pipe);
+  }
+#endif
+
   __aicore__ inline void ReduceSelected() {
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> input_queue;
@@ -448,13 +679,28 @@ class RoutePipeline {
       const uint64_t row = first_row_ + offset;
       const uint32_t rows = BatchRowCount(offset);
       LocalTensor<float> input = input_queue.AllocTensor<float>();
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+      GlobalTensor<float> source;
+      source.SetGlobalBuffer(selected_scores_);
+      DataCopyExtParams copy{static_cast<uint16_t>(rows), static_cast<uint32_t>(top_k_ * sizeof(float)), 0, 0, 0};
+      DataCopyPadExtParams<float> padding{true, 0, static_cast<uint8_t>(k_align_ - top_k_), 0.0F};
+      // AR reduces the padded row, so every tail lane must be zero.
+      DataCopyPad(input, source[row * top_k_], copy, padding);
+#else
       CopyInRows(input, selected_scores_, row, rows, top_k_, k_align_);
+#endif
       input_queue.EnQue(input);
       input = input_queue.DeQue<float>();
       LocalTensor<float> sums = sum_queue.AllocTensor<float>();
       LocalTensor<uint8_t> shared_tmp = shared_tmp_buffer.Get<uint8_t>();
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+      // ReduceSum follows the same row-reduction tree as CANN's routing normalization.
+      uint32_t shape[2] = {rows, k_align_};
+      ReduceSum<float, Pattern::Reduce::AR, false>(sums, input, shared_tmp, shape, true);
+#else
       SumParams params{rows, k_align_, static_cast<uint32_t>(top_k_)};
       Sum(sums, input, shared_tmp, params);
+#endif
       sum_queue.EnQue(sums);
       sums = sum_queue.DeQue<float>();
       CopyOutVector(row_sum_, row, rows, sums);
@@ -513,7 +759,7 @@ class RoutePipeline {
       denominator_queue.EnQue(denominators);
       denominators = denominator_queue.DeQue<float>();
       LocalTensor<float> output = output_queue.AllocTensor<float>();
-      if (top_k_ == 1) {
+      if (top_k_ == 1 || !normalize_) {
         DataCopy(output, weights, rows * k_align_);
       } else {
         LocalTensor<float> broadcast = broadcast_buffer.Get<float>();
@@ -522,7 +768,13 @@ class RoutePipeline {
         uint32_t src_shape[2] = {rows, 1};
         BroadCast<float, 2, 1>(broadcast, denominators, dst_shape, src_shape, shared_tmp);
         PipeBarrier<PIPE_V>();
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+        // CANN RealDiv uses DivHighPrecision, including its FTZ and NaN behavior.
+        static constexpr DivConfig div_config = {DivAlgo::DIFF_COMPENSATION};
+        Div<float, div_config>(output, weights, broadcast, rows * k_align_);
+#else
         Div(output, weights, broadcast, rows * k_align_);
+#endif
       }
       output_queue.EnQue(output);
       output = output_queue.DeQue<float>();
@@ -548,7 +800,12 @@ class RoutePipeline {
       input_queue.EnQue(input);
       input = input_queue.DeQue<float>();
       LocalTensor<float> output = output_queue.AllocTensor<float>();
-      Muls(output, input, routed_scaling_factor_, rows * k_align_);
+      if (use_sigmoid_) {
+        // PanGu owns the optional scaling operation after this subgraph.
+        DataCopy(output, input, rows * k_align_);
+      } else {
+        Muls(output, input, routed_scaling_factor_, rows * k_align_);
+      }
       output_queue.EnQue(output);
       output = output_queue.DeQue<float>();
       CopyOutRows(routing_weights_, row, rows, top_k_, k_align_, output);
@@ -640,6 +897,9 @@ class RoutePipeline {
   __gm__ float *vision_bias_ = nullptr;
   __gm__ bool *image_mask_ = nullptr;
   bool use_vision_bias_ = false;
+  bool use_sigmoid_ = false;
+  bool normalize_ = true;
+  bool use_bias_ = true;
   __gm__ float *routing_weights_ = nullptr;
   __gm__ int64_t *expert_indices_ = nullptr;
   __gm__ float *route_scores_ = nullptr;

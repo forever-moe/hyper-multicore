@@ -1,0 +1,247 @@
+{
+  "passed": true,
+  "regression_limit": 0.02,
+  "processes_per_side": 2,
+  "results": {
+    "T4096/kernel": {
+      "source_ms": 0.6240910148620605,
+      "target_ms": 0.6240098762512207,
+      "change": -0.00013001086204988965,
+      "confidence95": [
+        -0.0004619751857694032,
+        0.0016421165661029136
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          36487680,
+          36487680
+        ],
+        "target": [
+          36487680,
+          36487680
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T4096/forward": {
+      "source_ms": 0.6817204284667968,
+      "target_ms": 0.682542839050293,
+      "change": 0.0012063751490414276,
+      "confidence95": [
+        -0.0021993658591002996,
+        0.0033853913626011867
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          128238080,
+          128238080
+        ],
+        "target": [
+          128238080,
+          128238080
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T4096/forward_backward": {
+      "source_ms": 2.14094841003418,
+      "target_ms": 2.1419890594482425,
+      "change": 0.0004860693556114626,
+      "confidence95": [
+        -2.935448281082831e-05,
+        0.0011666634587077507
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          215631360,
+          215631360
+        ],
+        "target": [
+          215631360,
+          215631360
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T4096/checkpoint": {
+      "source_ms": 2.8424772644042973,
+      "target_ms": 2.841517181396484,
+      "change": -0.00033776277468811067,
+      "confidence95": [
+        -0.0008339179129023266,
+        0.00027956070055420404
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          222184960,
+          222184960
+        ],
+        "target": [
+          222184960,
+          222184960
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T6144/kernel": {
+      "source_ms": 0.9277278518676757,
+      "target_ms": 0.9287657165527343,
+      "change": 0.0011187167475561477,
+      "confidence95": [
+        -0.0003951096191783243,
+        0.002644079784586167
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          46342656,
+          46342656
+        ],
+        "target": [
+          46342656,
+          46342656
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T6144/forward": {
+      "source_ms": 1.0311844635009766,
+      "target_ms": 1.0329386138916017,
+      "change": 0.0017011024241673223,
+      "confidence95": [
+        0.0009042948906230475,
+        0.001929995783242005
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          180036096,
+          180036096
+        ],
+        "target": [
+          180036096,
+          180036096
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T6144/forward_backward": {
+      "source_ms": 3.2055667114257815,
+      "target_ms": 3.2056668090820315,
+      "change": 3.122619657025538e-05,
+      "confidence95": [
+        -0.0002829559300893125,
+        0.0002962505027972462
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          315581952,
+          315581952
+        ],
+        "target": [
+          315581952,
+          315581952
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    },
+    "T6144/checkpoint": {
+      "source_ms": 4.264950866699219,
+      "target_ms": 4.264682159423828,
+      "change": -6.300360397804017e-05,
+      "confidence95": [
+        -0.0003857698325844261,
+        0.0003524015990088447
+      ],
+      "status": "pass",
+      "peak_extra_bytes": {
+        "source": [
+          325412352,
+          325412352
+        ],
+        "target": [
+          325412352,
+          325412352
+        ]
+      },
+      "retained_extra_bytes": {
+        "source": [
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0
+        ]
+      }
+    }
+  }
+}

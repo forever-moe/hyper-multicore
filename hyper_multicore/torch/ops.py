@@ -86,7 +86,9 @@ def _load_native() -> None:
             dispatch_alias = schema.arguments[0].alias_info.before_set
             input_grad_alias = schema.arguments[12].alias_info.before_set
             if not dispatch_alias or dispatch_alias != input_grad_alias:
-                raise RuntimeError("adapter does not declare backward dispatch storage reuse; rebuild the Torch adapter")
+                raise RuntimeError(
+                    "adapter does not declare backward dispatch storage reuse; rebuild the Torch adapter"
+                )
         except (AttributeError, OSError, RuntimeError) as error:
             raise NativeComponentUnavailableError(
                 "[HP-NATIVE-FRAMEWORK-ADAPTER-LOAD-FAILED] component=multicore framework=torch "
@@ -1021,3 +1023,57 @@ def _mega_gate_route_grad(
         top_k,
         routed_scaling_factor,
     )
+
+def _mega_gate_sigmoid_route(
+    logits, bias, image_mask, runtime_config, diagnostic_buffer, *, top_k, normalize, use_bias=True, diagnostics=None,
+):
+    """Launch the unscaled logits-only sigmoid route on the current stream."""
+    _load_native()
+    if diagnostics is not None:
+        tokens, experts = logits.shape
+        outputs = (
+            torch.empty((tokens, top_k), dtype=logits.dtype, device=logits.device),
+            torch.empty((tokens, top_k), dtype=torch.int64, device=logits.device),
+            torch.empty((tokens, experts), dtype=logits.dtype, device=logits.device),
+            torch.empty((tokens, top_k), dtype=logits.dtype, device=logits.device),
+            torch.empty((tokens, 1), dtype=logits.dtype, device=logits.device),
+        )
+        parameters = (logits, bias, bias, image_mask, runtime_config, diagnostic_buffer, *outputs)
+        with diagnostics.launch(parameters, direction="forward") as call:
+            return torch.ops.hyper_multicore.mega_gate_sigmoid_route_out(
+                logits, bias, image_mask, call.runtime_config, call.diagnostic_buffer, *outputs,
+                top_k, normalize, use_bias,
+            )
+    return torch.ops.hyper_multicore.mega_gate_sigmoid_route(
+        logits, bias, image_mask, runtime_config, diagnostic_buffer, top_k, normalize, use_bias,
+    )
+
+
+def _mega_gate_sigmoid_route_grad(
+    logits, scores, selected, denominator, indices, grad_weights, runtime_config, diagnostic_buffer,
+    *, top_k, normalize,
+):
+    """Launch normalization backward, ScatterElementsV2 and SigmoidGrad."""
+    _load_native()
+    return torch.ops.hyper_multicore.mega_gate_sigmoid_route_grad(
+        logits, scores, selected, denominator, indices, grad_weights, runtime_config, diagnostic_buffer,
+        top_k, normalize,
+    )
+
+
+def _mega_gate_projection(
+    hidden: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor, runtime_config: torch.Tensor,
+    diagnostic_buffer: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, ...]:
+    """Launch the full-weight FP32 sigmoid TopK8 projection through the ordinary adapter."""
+    _load_native()
+    return torch.ops.hyper_multicore.mega_gate_projection(hidden, weight, bias, runtime_config, diagnostic_buffer)
+
+
+def _mega_gate_projection_mm(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+    """Compute a projection derivative with explicit FP32 CANN math."""
+    _load_native()
+    return torch.ops.hyper_multicore.mega_gate_projection_mm(left, right)
+
+
+__all__: list[str] = []

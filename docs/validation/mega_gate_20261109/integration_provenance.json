@@ -1,0 +1,54 @@
+{
+  "source_repository_files": {
+    "PanGu/models/transformer/moe/router.py": "f8c6173a3077d8c914bb1ed421ec0d4ccf76efc99c6101f6508971c3478088ad",
+    "tests/group3/integrated_tests/moe/test_mega_gate_router_npu.py": "6f50a62474b8107ab03fa0378c54ba6a47f3839d6b31689f3fe12515d975c863",
+    "tests/group3/integrated_tests/moe/test_mega_gate_distributed_npu.py": "32e9b2e4f8777001cbb818e90cc0af2ca1a00a0f87c289cdbfcf64fc0cde085c"
+  },
+  "capture_scripts": {
+    "router_compare.py": "a8a5c6005056692576ac68dcd9bf5f9aa4e9c009d4fde4f0636e6edcc36e800e",
+    "distributed_check.py": "398126ff2eb4b34103178bb8d43bcf62a49611cf7caf912a4438bdd08ef076a9",
+    "run_timings.bash": "1656d002c358bd84e3cd9c5ffdd5dd89d9a8be92ad66b4d60e11611b32519d05",
+    "run_router_followup.bash": "35144824870ffca76524d43ba038f24f91668f260ab5ecc869cb9f5fd8b7b2f9",
+    "router_checkpoint_followup.py": "75d79e60f26a3bc49e5860b802704e7cae14bd199543d39d40333de2c76d3867",
+    "run_checkpoint_followup.bash": "db18f305768b4d75ab8c78c21b62a09e4ab9e0c8baffea11fb39c812c3a89a21"
+  },
+  "cpu_affinity": [
+    68,
+    70,
+    72,
+    74,
+    76,
+    78,
+    80,
+    82
+  ],
+  "process_order": [
+    "source1",
+    "target1",
+    "target2",
+    "source2"
+  ],
+  "warmups": 20,
+  "rounds": 9,
+  "iterations": 100,
+  "device": 0,
+  "router_followup_order": [
+    "source3",
+    "target3",
+    "target4",
+    "source4"
+  ],
+  "outlier_policy": "Retain every original process and round; add two independent processes per side for Router because first ABBA confidence interval was inconclusive.",
+  "t4096_route_followup_order": [
+    "source5",
+    "target5",
+    "target6",
+    "source6"
+  ],
+  "processes_per_side": {
+    "component": 2,
+    "router_default": 4,
+    "router_t4096_route": 6
+  },
+  "t4096_route_harness_changes": "Same capture code restricted to the T4096 fixture and route mode. Every captured original round is retained."
+}

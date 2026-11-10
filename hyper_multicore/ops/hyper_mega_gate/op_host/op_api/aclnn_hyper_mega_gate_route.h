@@ -52,6 +52,32 @@ ACLNN_API aclnnStatus aclnnHyperMegaGateRouteGetWorkspaceSize(
 ACLNN_API aclnnStatus aclnnHyperMegaGateRoute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                               aclrtStream stream);
 
+/** Prepare unscaled FP32 sigmoid routing; normalize is ignored for top_k=1.
+ * Inputs and outputs follow the Route tensor contract, using bias for selection only.
+ * Normalized sigmoid routing supports K=1..8, 16, 128 and 384.
+ */
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRouteGetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *bias, const aclTensor *image_mask,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
+  const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, int64_t top_k, bool normalize,
+  uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRoute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                         aclrtStream stream);
+
+/** Prepare sigmoid routing with optional selection bias.
+ * Setting use_bias=false skips bias addition and uses TopK values as selected scores.
+ * The original entry point retains its ABI and always uses the supplied bias.
+ */
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRouteV2GetWorkspaceSize(
+  const aclTensor *logits, const aclTensor *bias, const aclTensor *image_mask,
+  const aclTensor *runtime_config, const aclTensor *diagnostic_buffer, const aclTensor *routing_weights,
+  const aclTensor *expert_indices, const aclTensor *route_scores, const aclTensor *selected_scores,
+  const aclTensor *normalization_denominator, int64_t top_k, bool normalize, bool use_bias,
+  uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnHyperMegaGateSigmoidRouteV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                         aclrtStream stream);
+
 #ifdef __cplusplus
 }
 #endif

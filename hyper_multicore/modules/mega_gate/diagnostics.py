@@ -37,6 +37,11 @@ MEGA_GATE_ROUTE_STAGE_NAMES = (
     "CastIndex",
 )
 
+MEGA_GATE_SIGMOID_ROUTE_STAGE_NAMES = (
+    "Sigmoid", "SqrtBypass", "AddBias", "TopK", "Gather", "ReduceSum", "AddEpsilon", "Div",
+    "CopyWeights", "CastIndex",
+)
+
 MEGA_GATE_ROUTE_GRAD_STAGE_NAMES = (
     "MulsScaleGrad",
     "BroadcastDenominator",
@@ -55,7 +60,6 @@ MEGA_GATE_ROUTE_GRAD_K1_STAGE_NAMES = (
     "MulsScaleGrad",
     "ZerosLike",
 )
-
 
 
 def _port(name: str, position: int, dtype_size: int = 4) -> TensorSpec:
@@ -89,7 +93,7 @@ def _row_view(context: L1TensorViewContext) -> L1TensorView:
                              source_offset_bytes=offset * row_elements * tensor.element_size())
 
 
-def bind_pipeline_graph(graph: Any, config: Any, *, backward: bool = False) -> ComputeGraph:
+def bind_pipeline_graph(graph: Any, config: Any, *, backward: bool = False, use_sigmoid: bool = False) -> ComputeGraph:
     """Build diagnostic ports only; native stages still use their original ABI.
 
     RouteGrad's scatter/sqrt/softplus tail is launched by ACLNN after the MegaKernel.
@@ -100,6 +104,7 @@ def bind_pipeline_graph(graph: Any, config: Any, *, backward: bool = False) -> C
         graph: Graph placeholder replaced by the lazily constructed broadcast graph.
         config: Configuration consumed by this callback.
         backward: Whether to prepare the RouteGrad pipeline instead of Route.
+        use_sigmoid: Bind scores to the Sigmoid producer and describe the sigmoid ACLNN tail.
     """
     p = _port
     if backward:
@@ -109,13 +114,14 @@ def bind_pipeline_graph(graph: Any, config: Any, *, backward: bool = False) -> C
         if config.task_num != 2:
             bindings["BroadcastDenominator"] = ([p("normalization_denominator", 1)], [])
             bindings["DivSelected"] = ([p("selected_scores", 0)], [])
-        bindings["RouteGradPost"] = (
+        tail_name = "SigmoidGradPost" if use_sigmoid else "RouteGradPost"
+        bindings[tail_name] = (
             [p("logits", 10), p("route_scores", 3), p("expert_indices", 4, 8),
              p("selected_scores", 0), p("normalization_denominator", 1)], [p("grad_logits", 9)],
         )
-        names = (*names, "RouteGradPost")
+        names = (*names, tail_name)
     else:
-        names = MEGA_GATE_ROUTE_STAGE_NAMES
+        names = MEGA_GATE_SIGMOID_ROUTE_STAGE_NAMES if use_sigmoid else MEGA_GATE_ROUTE_STAGE_NAMES
         score, selected, denominator = p("route_scores", 8), p("selected_scores", 9), p("normalization_denominator", 10)
         bindings = {
             "Softplus": ([p("logits", 0)], []),
@@ -125,6 +131,12 @@ def bind_pipeline_graph(graph: Any, config: Any, *, backward: bool = False) -> C
             "AddEpsilon": ([], [denominator]), "Div": ([selected, denominator], []),
             "MulScale": ([], [p("routing_weights", 6)]), "CastIndex": ([], [p("expert_indices", 7, 8)]),
         }
+        if use_sigmoid:
+            bindings.pop("Softplus")
+            bindings.pop("Sqrt")
+            bindings["Sigmoid"] = ([p("logits", 0)], [score])
+            bindings["SqrtBypass"] = ([], [])
+            bindings["CopyWeights"] = bindings.pop("MulScale")
     graph = ComputeGraph()
     previous = None
     for index, name in enumerate(names):

@@ -43,6 +43,8 @@ _OPS_NN_PATHS = (
     "norm/rms_norm/op_kernel",
     "norm/rms_norm_grad/op_kernel",
     "index/linear_index/op_host/op_api",
+    "matmul/common",
+    "matmul/mat_mul_v3/op_kernel/arch35",
 )
 _OPS_NN_PATHS += QUANT_SOURCE_PATHS
 _OPS_TRANSFORMER_PATHS = ("gmm/grouped_matmul/op_kernel", "gmm/common/cgmct")
@@ -60,6 +62,7 @@ _HYPER_OPERATORS = (
     "hyper_mega_moe_grad",
     "hyper_mega_gate",
     "hyper_mega_gate_grad",
+    "hyper_mega_gate_projection",
 )
 
 
@@ -259,6 +262,13 @@ def _compose_hyper_multicore_ops(
     for operator_name in _HYPER_OPERATORS:
         operator_root = source_root / operator_name
         shutil.copytree(_MULTICORE_OPS / operator_name, operator_root)
+        if operator_name == "hyper_mega_gate_projection":
+            kernel = operator_root / "op_kernel"
+            shutil.copytree(_MULTICORE_OPS / "runtime", kernel / "runtime")
+            shutil.copytree(ops_nn_copy / "matmul/common", kernel / "matmul_common")
+            shutil.copytree(ops_nn_copy / "matmul/mat_mul_v3/op_kernel/arch35", kernel / "matmul_arch35")
+            shutil.copytree(_MULTICORE_OPS / "hyper_mega_gate", kernel / "hyper_mega_gate")
+            continue
         if operator_name == "hyper_mega_gate":
             shutil.copytree(_MULTICORE_OPS / "runtime", operator_root / "op_kernel" / "runtime")
             continue
@@ -328,6 +338,9 @@ def _compose_hyper_multicore_ops(
 def _require_assembled_files(source_root: Path) -> None:
     """Reject incomplete source closures before invoking the CANN toolchain."""
     required_paths = (
+        source_root / "hyper_mega_gate_projection/op_kernel/hyper_mega_gate_projection.cpp",
+        source_root / "hyper_mega_gate_projection/op_kernel/matmul_arch35/block_scheduler_aswt.h",
+        source_root / "hyper_mega_gate_projection/op_kernel/runtime/cube_tile_pipeline_worker.h",
         source_root / "hyper_mega_moe" / "op_host" / "hyper_mega_moe_def.cpp",
         source_root / "hyper_mega_moe" / "op_kernel" / "hyper_mega_moe.cpp",
         source_root / "hyper_mega_moe" / "op_kernel" / "swi_glu" / "swi_glu.cpp",
