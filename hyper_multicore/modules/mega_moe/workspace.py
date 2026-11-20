@@ -401,7 +401,9 @@ class MegaMoeWorkspace:
             )
             self.completion_event = torch.npu.Event()
             self.completion_stream = None
-        except Exception:
+        except Exception as error:
+            if _lifecycle._is_runtime_unavailable(error):  # pylint: disable=protected-access
+                raise
             self._free_symmetric_tensors()
             self._free_local_tensors()
             raise

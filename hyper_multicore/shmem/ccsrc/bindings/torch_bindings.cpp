@@ -47,6 +47,7 @@ namespace {
 using cann::CompareOp;
 using cann::SignalOp;
 using runtime::AllocationRecord;
+using runtime::AllocationFailureStage;
 using runtime::AllocationSpec;
 using runtime::AllocationView;
 using runtime::Config;
@@ -95,6 +96,8 @@ std::string_view ToString(State state) {
       return "Ready";
     case State::ShutdownFailed:
       return "ShutdownFailed";
+    case State::AllocationFailed:
+      return "AllocationFailed";
   }
   return "Unknown";
 }
@@ -412,41 +415,47 @@ at::Tensor Empty(const std::vector<int64_t> &shape, c10::ScalarType dtype, const
   const c10::Device device(c10::DeviceType::PrivateUse1, CurrentDeviceIndex());
   const uint64_t allocation_bytes = CalculateAllocationBytes(shape, dtype);
   const uint64_t alignment_bytes = NormalizeAlignment(alignment);
+  auto token = std::make_shared<StorageAssociationToken>(0);
   const auto record = UnwrapRuntime(Runtime::Instance().Allocate(AllocationSpec{allocation_bytes, alignment_bytes}),
                                     DfxOperation::Allocate);
-  const auto root_rank_result = Runtime::Instance().RootRank();
-  const int32_t root_rank = root_rank_result.ok() ? root_rank_result.value() : -1;
-
-  auto token = std::make_shared<StorageAssociationToken>(record.allocation_id);
-  auto deleter = [token](void *) {
-    const auto association =
-      StorageAssociations::Instance().Remove(token->storage.load(std::memory_order_acquire), token->allocation_id);
-    if (association.has_value() && association->state == StorageAssociations::State::Active) {
-      Runtime::Instance().RecordLeak(association->allocation_id, association->allocation_base,
-                                     association->allocation_bytes);
-      runtime::log::Line(
-        runtime::log::Level::Error, association->root_rank, __FILE__, __LINE__, "StorageRelease", "Validation",
-        "orphaned=true allocation_id=%" PRIu64 " allocation_base=0x%" PRIx64 " allocation_bytes=%" PRIu64
-        " "
-        "The last Tensor Storage reference was dropped without shmem.free(). The Allocation remains active "
-        "and cannot be freed through the Tensor API. Call shmem.free(tensor) before overwriting or dropping its "
-        "last reference. The final shmem.release() will fail; restart the process to recover.",
-        association->allocation_id, association->allocation_base, association->allocation_bytes);
+  token->allocation_id = record.allocation_id;
+  try {
+    const auto root_rank_result = Runtime::Instance().RootRank();
+    const int32_t root_rank = root_rank_result.ok() ? root_rank_result.value() : -1;
+    auto deleter = [token](void *) {
+      const auto association =
+        StorageAssociations::Instance().Remove(token->storage.load(std::memory_order_acquire), token->allocation_id);
+      if (association.has_value() && association->state == StorageAssociations::State::Active) {
+        Runtime::Instance().RecordLeak(association->allocation_id, association->allocation_base,
+                                       association->allocation_bytes);
+        runtime::log::Line(
+          runtime::log::Level::Error, association->root_rank, __FILE__, __LINE__, "StorageRelease", "Validation",
+          "orphaned=true allocation_id=%" PRIu64 " allocation_base=0x%" PRIx64 " allocation_bytes=%" PRIu64
+          " "
+          "The last Tensor Storage reference was dropped without shmem.free(). The Allocation remains active "
+          "and cannot be freed through the Tensor API. Call shmem.free(tensor) before overwriting or dropping its "
+          "last reference. The final shmem.release() will fail; restart the process to recover.",
+          association->allocation_id, association->allocation_base, association->allocation_bytes);
+      }
+    };
+    at::Tensor tensor =
+      at_npu::native::from_blob(reinterpret_cast<void *>(record.allocation_base), shape, std::move(deleter),
+                                at::TensorOptions().dtype(dtype).device(device), c10::optional<c10::Device>(device));
+    c10::StorageImpl *storage = tensor.storage().unsafeGetStorageImpl();
+    token->storage.store(storage, std::memory_order_release);
+    if (!StorageAssociations::Instance().Insert(
+          storage, StorageAssociations::Record{record.allocation_id, record.allocation_base, record.allocation_bytes,
+                                               root_rank, StorageAssociations::State::Active})) {
+      ThrowStatus(Status{ErrorCode::InvalidState, std::nullopt,
+                         "Tensor Storage is already associated with another symmetric Allocation"},
+                  DfxOperation::Allocate, DfxPhase::Validation);
     }
-  };
-  at::Tensor tensor =
-    at_npu::native::from_blob(reinterpret_cast<void *>(record.allocation_base), shape, std::move(deleter),
-                              at::TensorOptions().dtype(dtype).device(device), c10::optional<c10::Device>(device));
-  c10::StorageImpl *storage = tensor.storage().unsafeGetStorageImpl();
-  token->storage.store(storage, std::memory_order_release);
-  if (!StorageAssociations::Instance().Insert(
-        storage, StorageAssociations::Record{record.allocation_id, record.allocation_base, record.allocation_bytes,
-                                             root_rank, StorageAssociations::State::Active})) {
-    ThrowStatus(Status{ErrorCode::InvalidState, std::nullopt,
-                       "Tensor Storage is already associated with another symmetric Allocation"},
-                DfxOperation::Allocate, DfxPhase::Validation);
+    return tensor;
+  } catch (...) {
+    Runtime::Instance().MarkAllocationFailed(AllocationFailureStage::PublishTensor, record.allocation_base,
+                                            record.allocation_bytes);
+    throw;
   }
-  return tensor;
 }
 
 /**
@@ -761,6 +770,7 @@ py::dict DebugState() {
   result["allocated_count"] = OptionalValue(snapshot.allocated_count);
   result["allocated_bytes"] = OptionalValue(snapshot.allocated_bytes);
   result["remaining_bytes"] = snapshot.config.has_value() && snapshot.allocated_bytes.has_value()
+                                && !snapshot.allocation_failure.has_value()
                                 ? py::cast(snapshot.config->heap_size_bytes - *snapshot.allocated_bytes)
                                 : py::none();
   result["max_allocated_bytes"] = OptionalValue(snapshot.max_allocated_bytes);
@@ -768,6 +778,16 @@ py::dict DebugState() {
   result["leaked_allocations"] = AllocationRecordsObject(snapshot.leaked_allocations);
   result["latest_failure"] =
     snapshot.latest_failure.has_value() ? py::object(FailureDict(*snapshot.latest_failure)) : py::none();
+  if (snapshot.allocation_failure.has_value()) {
+    const auto &failure = *snapshot.allocation_failure;
+    py::dict detail;
+    detail["stage"] = failure.stage == AllocationFailureStage::Register ? "Register" : "PublishTensor";
+    detail["allocation_base"] = failure.allocation_base;
+    detail["allocation_bytes"] = failure.allocation_bytes;
+    result["allocation_failure"] = std::move(detail);
+  } else {
+    result["allocation_failure"] = py::none();
+  }
   return result;
 }
 
@@ -788,6 +808,7 @@ PYBIND11_MODULE(hyper_multicore_shmem_torch, module) {
   module.def("_initialize", &bindings::Initialize, py::arg("root_rank"), py::arg("root_size"),
              py::arg("unique_id") = py::bytes(), py::arg("heap_size_bytes") = 0);
   module.def("_empty", &bindings::Empty, py::arg("shape"), py::arg("dtype"), py::arg("alignment") = std::nullopt);
+  module.def("_allocation_failed", [] { return bindings::Runtime::Instance().HasAllocationFailure(); });
   module.def("_free", &bindings::Free, py::arg("tensor"));
   module.def("_barrier", &bindings::Barrier, py::kw_only(), py::arg("blocking") = true);
   module.def("_put", &bindings::Put, py::arg("remote_dst"), py::arg("local_src"), py::arg("target_pe"));

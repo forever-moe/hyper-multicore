@@ -158,9 +158,13 @@ class _HeapManager:
         try:
             if self.state == "failed":
                 raise RuntimeError(
-                    "SHMEM Heap is no longer usable after a failed restart; restart the process"
+                    "SHMEM Heap is no longer usable after an unrecoverable Runtime failure; restart the process"
                 )
             yield
+        except Exception as error:
+            if _lifecycle._is_runtime_unavailable(error):  # pylint: disable=protected-access
+                self.state = "failed"
+            raise
         finally:
             self._lock.release()
 

@@ -34,12 +34,26 @@ inline void WaitFlag(uint32_t) {}
 using AscendC::GetTPipePtr;
 #include "hyper_multicore/ops/runtime/runtime_config.hpp"
 #include "hyper_multicore/ops/runtime/runtime_storage_bounds_host.h"
+// The validation helper only needs the production layout, not the AIV executor.
+#define MULTICORE_SCHEDULER_AIV_PIPELINE_WORKER_H
+#include "hyper_multicore/ops/hyper_mega_gate_grad/op_kernel/route_grad_runtime.h"
 
 #include "hyper_multicore/ops/common/swiglu_task_options.h"
 #include "hyper_multicore/ops/common/mega_moe/probability_abi.h"
 #include "hyper_multicore/ops/common/mega_moe/task_options.h"
 
 namespace Runtime = MulticoreRuntime;
+
+extern "C" bool valid_route_grad(uint8_t *image, uint64_t bytes) {
+  struct Bounds {
+    uint64_t runtimeConfigBytes;
+    uint64_t diagnosticBufferBytes;
+    uint32_t activeAivWorkerCount = 1;
+    uint32_t aivWorkerSlotCapacity = 48;
+    uint32_t stageCount = 2;
+  } tiling{bytes, 0};
+  return IsRouteGradRuntimeValid(image, tiling);
+}
 
 static_assert(sizeof(Runtime::TensorDesc) == 64);
 static_assert(sizeof(Runtime::TaskDesc) == 576);

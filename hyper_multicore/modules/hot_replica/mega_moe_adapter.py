@@ -23,6 +23,7 @@ from typing import Any, TYPE_CHECKING
 
 import torch
 
+from hyper_multicore.shmem import _lifecycle
 from hyper_multicore.modules.mega_moe.heap_manager import _WorkspaceLayout, _workspace_layout
 from hyper_multicore.modules.mega_moe.spec import _align_capacity
 
@@ -76,7 +77,8 @@ def workspace_reservations(
         source = _align_capacity(bound)
         native, virtual = _bounded_receive(specification, source, dtype, cube_cores)
         reservations.append((specification, _workspace_layout(specification, dtype, native, source)))
-        virtual_spec = {**specification, "num_experts": 2 * specification["num_experts"], "hot_replica": False, "source_token_bound": None, "planner_key": None}
+        virtual_spec = {**specification, "num_experts": 2 * specification["num_experts"],
+                        "hot_replica": False, "source_token_bound": None, "planner_key": None}
         headroom += _workspace_layout(virtual_spec, dtype, virtual, source).required_bytes
         local = specification["num_experts"] // specification["ep_size"]
         bank = local, specification["hidden_size"], specification["intermediate_size"]
@@ -103,7 +105,8 @@ def _get_mega_bank(hidden, parent, owner):
                 spec.num_cube_cores, spec.expert_weight_layout, root=manager, access=manager.access,
             )
             reservation = {
-                "kind": "hot_replica_expert_bank", "layout": spec.expert_weight_layout, "local_experts": spec.local_experts,
+                "kind": "hot_replica_expert_bank", "layout": spec.expert_weight_layout,
+                "local_experts": spec.local_experts,
             }
             signature = (
                 "hot_replica_expert_bank", spec.local_experts, spec.hidden_size, spec.intermediate_size,
@@ -114,8 +117,9 @@ def _get_mega_bank(hidden, parent, owner):
             manager.bind(pool, spec, reservation)
             try:
                 pool.allocate()
-            except Exception:
-                manager.close_workspace(pool)
+            except Exception as error:
+                if not _lifecycle._is_runtime_unavailable(error):  # pylint: disable=protected-access
+                    manager.close_workspace(pool)
                 raise
             banks[key] = pool
             pool.owners = weakref.WeakSet()

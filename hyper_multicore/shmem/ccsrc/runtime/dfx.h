@@ -44,6 +44,16 @@ struct DfxFailure {
   Status status;
 };
 
+/** @brief Allocation ownership boundary at which the Runtime became unusable. */
+enum class AllocationFailureStage : uint8_t { Register, PublishTensor };
+
+/** @brief Fixed-size failure context that requires no Host allocation to record. */
+struct AllocationFailure {
+  AllocationFailureStage stage;
+  uintptr_t allocation_base;
+  uint64_t allocation_bytes;
+};
+
 /**
  * @brief Owned snapshot of current process-local Runtime facts.
  * @details Exposes active and leaked Allocation identities, base addresses, and byte counts for diagnostics; contains
@@ -61,6 +71,7 @@ struct DfxSnapshot {
   std::optional<std::vector<AllocationRecord>> active_allocations;
   std::optional<std::vector<AllocationRecord>> leaked_allocations;
   std::optional<DfxFailure> latest_failure;
+  std::optional<AllocationFailure> allocation_failure;
 };
 
 }  // namespace hyper_multicore::shmem::runtime

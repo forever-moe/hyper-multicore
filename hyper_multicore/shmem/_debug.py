@@ -107,6 +107,8 @@ def debug_state() -> dict[str, object]:
     stored values remain integers. CANN rounds blocks to 16-byte multiples, so true device occupancy can be higher.
     ``leaked_allocations`` lists Allocations whose last Tensor Storage reference was dropped without
     ``shmem.free()``, in drop order, using the same fields as ``active_allocations``.
+    ``allocation_failure`` records the first Register/PublishTensor failure and its original address and byte count.
+    In ``AllocationFailed``, ``remaining_bytes`` is ``None`` because the registry may not cover all physical blocks.
 
     After the final clean ``shmem.release()``, the state is ``Uninitialized`` and lifecycle-specific Root, device,
     config, Allocation, maximum-active-allocation, leaked-allocation, and latest-failure fields are ``None`` until

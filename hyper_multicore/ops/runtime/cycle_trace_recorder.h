@@ -23,30 +23,6 @@ using namespace AscendC;  // NOLINT(build/namespaces)
 
 namespace MulticoreRuntime {
 
-constexpr uint32_t CYCLE_TRACE_RESERVED_WORDS = 9;
-
-struct CycleTraceCoreHeader {
-  uint64_t entryCycle;
-  uint32_t recordCount;
-  uint32_t droppedCount;
-  uint32_t coreType;
-  uint32_t blockId;
-  uint32_t recordCapacity;
-  uint32_t reserved[CYCLE_TRACE_RESERVED_WORDS];
-};
-
-struct CycleTraceRecord {
-  uint64_t startCycle;
-  uint64_t endCycle;
-  uint32_t descId;
-  uint32_t taskId;
-  uint32_t stageTaskIndex;
-  uint32_t ownerId;
-};
-
-static_assert(sizeof(CycleTraceCoreHeader) == 64, "Unexpected cycle trace core header size");
-static_assert(sizeof(CycleTraceRecord) == 32, "Unexpected cycle trace record size");
-
 class CycleTraceRecorder {
  public:
   static constexpr uint32_t MAX_RECORDS_PER_CORE =

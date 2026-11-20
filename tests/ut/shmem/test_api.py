@@ -18,7 +18,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from hyper_multicore.shmem import _api, _debug
+from hyper_multicore.shmem import _api, _debug, _lifecycle
 
 
 class _Tensor:
@@ -61,6 +61,28 @@ class TestShmemApiDiagnostics(unittest.TestCase):
         self.assertIsInstance(state["reference_count"], int)
         self.assertEqual(list(state)[:2], ["state", "reference_count"])
         self.assertEqual(repr(state).splitlines()[:2], ["state: Ready", "reference_count: 2"])
+
+    def test_allocation_failure_invalidates_runtime_without_losing_cause(self) -> None:
+        """Reject reuse after unpublished allocations, preserving ordinary validation failures."""
+        torch = SimpleNamespace(get_default_dtype=Mock(return_value="torch.float32"))
+        for terminal in (False, True):
+            error = MemoryError("host allocation failed") if terminal else ValueError("invalid allocation")
+            native = SimpleNamespace(_empty=Mock(side_effect=error),
+                                     _allocation_failed=Mock(return_value=terminal))
+            with self.subTest(terminal=terminal), \
+                    patch.object(_lifecycle, "_runtime_invalidated", False), \
+                    patch.object(_api, "_torch_modules", return_value=(torch, object())), \
+                    patch.object(_api, "_load_native", return_value=native):
+                with self.assertRaises(type(error)) as raised:
+                    _api.empty(8)
+                self.assertIs(raised.exception, error)
+                if terminal:
+                    self.assertTrue(_lifecycle._runtime_invalidated)
+                    with self.assertRaisesRegex(RuntimeError, "restart the process"):
+                        _api.empty(8)
+                    native._empty.assert_called_once()
+                else:
+                    self.assertFalse(_lifecycle._runtime_invalidated)
 
     def test_allocation_log_records_only_direct_callsite(self) -> None:
         """Render the first SHMEM-external caller without a complete stack chain."""

@@ -24,6 +24,7 @@ enum class State : uint8_t {
   Uninitialized,
   Ready,
   ShutdownFailed,
+  AllocationFailed,
 };
 
 /** @brief Runtime error categories shared by the C++ core and framework bindings. */

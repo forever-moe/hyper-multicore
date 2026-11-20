@@ -54,7 +54,7 @@ _CONVERGENCE_FAILURE_HINT = (
     "The SHMEM Runtime can no longer be managed safely after Root convergence failed; restart the process."
 )
 _INVALIDATED_RUNTIME_MESSAGE = (
-    "SHMEM Runtime is no longer usable after a shutdown or restart failure; restart the process"
+    "SHMEM Runtime is no longer usable after an unrecoverable failure; restart the process"
 )
 
 
@@ -118,6 +118,18 @@ def _runtime_is_healthy() -> bool:
     """Return whether the process Runtime accepts SHMEM calls."""
     with _lock:
         return _users > 0 and not _runtime_invalidated
+
+
+def _invalidate_on_allocation_failure(native: Any) -> None:
+    """Latch a terminal native Allocation failure without changing its exception."""
+    global _runtime_invalidated  # pylint: disable=global-statement
+    if native._allocation_failed():  # pylint: disable=protected-access
+        _runtime_invalidated = True
+
+
+def _is_runtime_unavailable(error: Exception) -> bool:
+    """Recognize a latched Runtime failure or an unavailable-stage error."""
+    return _runtime_invalidated or isinstance(error, _RuntimeUnavailableError)
 
 
 def _host_barrier() -> None:
@@ -323,10 +335,11 @@ def _execute_local_stage(operation: Callable[[], Any]) -> tuple[_StagePayload, E
     try:
         return (operation(), None, False), None
     except Exception as exception:  # pylint: disable=broad-exception-caught
-        runtime_unavailable = isinstance(exception, _RuntimeUnavailableError)
-        diagnostic = exception.__cause__ if runtime_unavailable and exception.__cause__ is not None else exception
-        local_error = exception.__cause__ if runtime_unavailable else exception
-        if runtime_unavailable and diagnostic is exception:
+        wrapped = isinstance(exception, _RuntimeUnavailableError)
+        runtime_unavailable = _is_runtime_unavailable(exception)
+        diagnostic = exception.__cause__ if wrapped and exception.__cause__ is not None else exception
+        local_error = exception.__cause__ if wrapped else exception
+        if wrapped and diagnostic is exception:
             report = "RuntimeError", _exception_summary(diagnostic)
         else:
             report = _collective.failure_report(diagnostic, message=_exception_summary(diagnostic))
@@ -336,11 +349,14 @@ def _execute_local_stage(operation: Callable[[], Any]) -> tuple[_StagePayload, E
 def _evaluate_stage_results(peers: list[_StagePayload], local_value: Any, local_error: Exception | None,
                             action: str, stage: str) -> None:
     """Raise a local diagnostic for peer failures or inconsistent stage values."""
+    global _runtime_invalidated  # pylint: disable=global-statement
     if not any(item[1] is not None for item in peers):
         if any(item[0] != local_value for item in peers):
             raise RuntimeError(f"{action} failed during {stage}: values differ across Root ranks")
         return
     runtime_unavailable = any(item[2] for item in peers)
+    if runtime_unavailable:
+        _runtime_invalidated = True
     details = _collective.format_collective_failures(
         [item[1] for item in peers],
         rank_label="root_rank",
@@ -358,14 +374,19 @@ def _reconfiguration_stage(
     root_group: Any,
 ) -> float:
     """Execute a stage and agree on its returned manifest; non-manifest stages return None."""
+    global _runtime_invalidated  # pylint: disable=global-statement
     started = time.perf_counter()
     payload, local_error = _execute_local_stage(operation)
-    peers = _collective.exchange(
-        payload,
-        group=root_group,
-        failure_prefix=f"{action} failed during {stage} while converging Root rank results",
-    )
-    _evaluate_stage_results(peers, payload[0], local_error, action, stage)
+    try:
+        peers = _collective.exchange(
+            payload,
+            group=root_group,
+            failure_prefix=f"{action} failed during {stage} while converging Root rank results",
+        )
+        _evaluate_stage_results(peers, payload[0], local_error, action, stage)
+    except _collective.CollectiveConvergenceError:
+        _runtime_invalidated = True
+        raise
     return (time.perf_counter() - started) * 1000
 
 
@@ -527,7 +548,7 @@ def _restart(
 
             # _api imports lifecycle guards, so the local import avoids a cycle while reusing Allocation validation
             # and diagnostics.
-            from . import _api  # pylint: disable=import-outside-toplevel
+            from . import _api  # pylint: disable=import-outside-toplevel,cyclic-import
 
             replacement_tensors = []
 

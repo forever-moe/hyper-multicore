@@ -35,6 +35,8 @@ const char *StateName(State state) {
       return "Ready";
     case State::ShutdownFailed:
       return "ShutdownFailed";
+    case State::AllocationFailed:
+      return "AllocationFailed";
   }
   return "Unknown";
 }
@@ -209,7 +211,13 @@ Result<AllocationRecord> Runtime::Allocate(const AllocationSpec &spec) {
     return Result<AllocationRecord>::Failure(allocation.error());
   }
 
-  const AllocationRecord record = allocations_->Register(spec, allocation.value());
+  AllocationRecord record;
+  try {
+    record = allocations_->Register(spec, allocation.value());
+  } catch (...) {
+    MarkAllocationFailedLocked(AllocationFailureStage::Register, allocation.value(), spec.bytes);
+    throw;
+  }
   HP_SM_LOG_DEBUG(root_rank, "Allocate", "CannCall", "%s ok allocation_id=%" PRIu64, allocation_call,
                   record.allocation_id);
   return Result<AllocationRecord>::Success(record);
@@ -286,6 +294,7 @@ DfxSnapshot Runtime::DebugState() const {
   snapshot.device_identity = device_identity_;
   snapshot.config = config_;
   snapshot.latest_failure = latest_failure_;
+  snapshot.allocation_failure = allocation_failure_;
   if (allocations_.has_value()) {
     snapshot.allocated_count = allocations_->allocated_count();
     snapshot.allocated_bytes = allocations_->allocated_bytes();
@@ -299,6 +308,26 @@ DfxSnapshot Runtime::DebugState() const {
 void Runtime::RecordLeak(uint64_t allocation_id, uintptr_t allocation_base, uint64_t allocation_bytes) {
   std::lock_guard<std::mutex> lock(mutex_);
   leaked_allocations_.push_back(AllocationRecord{allocation_id, allocation_base, allocation_bytes, 0});
+}
+
+void Runtime::MarkAllocationFailedLocked(AllocationFailureStage stage, uintptr_t base, uint64_t bytes) noexcept {
+  if (allocation_failure_.has_value()) return;
+  state_ = State::AllocationFailed;
+  allocation_failure_.emplace(AllocationFailure{stage, base, bytes});
+  log::Line(log::Level::Error, RootRankForDfx(), __FILE__, __LINE__, "Allocate",
+            stage == AllocationFailureStage::Register ? "Register" : "PublishTensor",
+            "runtime_unavailable=true allocation_base=0x%" PRIxPTR " allocation_bytes=%" PRIu64
+            " restart the process; no collective rollback attempted", base, bytes);
+}
+
+void Runtime::MarkAllocationFailed(AllocationFailureStage stage, uintptr_t base, uint64_t bytes) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  MarkAllocationFailedLocked(stage, base, bytes);
+}
+
+bool Runtime::HasAllocationFailure() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return allocation_failure_.has_value();
 }
 
 Status Runtime::Shutdown() {

@@ -347,6 +347,7 @@ SHMEM生命周期依据明确的状态和异常类别判定恢复行为。CANN/N
 | 健康Runtime在破坏性操作前发生安全校验失败，且Root收敛成功 | 保留Runtime、引用及Allocation，修正条件后可重试 |
 | 已有terminal状态、Native状态漂移或设备同步失败 | Runtime不可用，要求终止并重启进程 |
 | Root通信状态变化、通信查询或结果交换失败 | 能够返回的rank标记Runtime不可用，不承诺可重试 |
+| 对称内存物理分配成功后，登记或Tensor发布失败 | Native进入`AllocationFailed`，Python生命周期及所属MegaMoE HeapManager不可继续使用；保留原始异常，要求终止并重启进程 |
 | restart进入ReleaseAllocations后任一阶段失败，或final release进入Native Shutdown后失败 | Runtime保持terminal，拒绝后续操作和引用 |
 | 物理restart成功后的MegaMoe本地验证失败 | 本地HeapManager进入failed，不绑定workspace、不发布layout、capacity、heap size、epoch或growth record |
 | MegaMoe本地绑定失败 | 本地HeapManager进入failed，部分workspace字段可能已改变，业务状态不再继续发布 |
@@ -355,6 +356,11 @@ SHMEM生命周期依据明确的状态和异常类别判定恢复行为。CANN/N
 collective，不保证其他rank同步失败或尚未发布状态；两者失败均属于作业级不可恢复错误。失败rank保留直接cause，
 不得继续训练、单rank释放或回滚新Allocation，异常必须传播给launcher以终止其余rank并重启作业。
 vendor collective阻塞或进程退出依赖通信库及launcher超时。
+
+分配失败的阶段区分为`Register`和`PublishTensor`。前者尚未登记物理内存，后者已登记但未返回Tensor；
+两者均不在异常处理或Tensor析构中执行单rank collective回滚。首次workspace分配遇到此类错误时，
+直接传播失败，不再进入局部对称内存清理。正常参数校验失败和物理分配返回的错误不因此一律失效。
+容量足够时，训练继续复用既有workspace，不增加每次分配的结果交换或每步状态轮询。
 
 ```mermaid
 flowchart TB
@@ -418,6 +424,12 @@ ACL逻辑设备编号，不表示机器上的物理卡号。HP初始化失败汇
 和精简HBM快照，但不嵌入`cann_detail`；原始CANN日志、异常和`debug_state()`提供完整诊断。
 `SHMEM_LOG_LEVEL=DEBUG`时，
 `shmem.empty`额外记录直接调用点，可结合`allocation_base`定位泄漏来源。
+
+`AllocationFailed`的固定大小失败记录通过`debug_state()["allocation_failure"]`展示`stage`、
+`allocation_base`和`allocation_bytes`。本地分配错误原样抛出，已有集体阶段的错误汇总保留本地原始cause；
+阶段信息由Native日志和失败记录提供，不在分配错误路径额外创建诊断异常。
+该状态下`remaining_bytes`为`None`，已登记字节数不代表物理heap的完整占用。
+完整`debug_state()`仍需主机内存，主机内存耗尽时不保证可以生成；Runtime失效不依赖诊断输出成功。
 
 ## 7. 安全边界
 

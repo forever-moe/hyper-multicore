@@ -67,7 +67,8 @@ class Runtime final {
    * bytes and alignment_bytes are measured in Byte. Zero alignment selects ordinary allocation; a positive alignment
    * must be a power of two. Before entering the CANN allocator, Runtime verifies that the caller-selected ACL device
    * matches the device frozen at initialization. All Root PEs must issue collective Allocations in the same order with
-   * the same arguments.
+   * the same arguments. A registration exception after physical allocation makes this Runtime terminal and preserves
+   * the original exception; no local collective rollback is attempted.
    */
   Result<AllocationRecord> Allocate(const AllocationSpec &spec);
 
@@ -99,12 +100,19 @@ class Runtime final {
   /** @brief Append one leaked Allocation (last Storage reference lost while Active) to the DFX record. */
   void RecordLeak(uint64_t allocation_id, uintptr_t allocation_base, uint64_t allocation_bytes);
 
+  /** @brief Stop local use after an Allocation cannot be registered or published; never enter collective cleanup. */
+  void MarkAllocationFailed(AllocationFailureStage stage, uintptr_t allocation_base, uint64_t allocation_bytes);
+
+  /** @brief Check whether registration or publication made the Runtime terminal, without allocating a snapshot. */
+  bool HasAllocationFailure() const;
+
   /**
    * @brief End the process Runtime lifecycle after framework quiescence.
    *
    * Ready with no active Allocations calls CANN finalize once and returns to Uninitialized on success. Active
    * Allocations reject shutdown before finalize. A finalize failure becomes terminal (ShutdownFailed) because the
    * CANN state is then indeterminate. Calling Shutdown while Uninitialized or ShutdownFailed is a local no-op.
+   * AllocationFailed rejects shutdown and requires a process restart, without calling CANN cleanup.
    */
   Status Shutdown();
 
@@ -122,6 +130,8 @@ class Runtime final {
   // Precondition: the caller holds mutex_ and State::Ready guarantees root_, device_identity_, and allocations_.
   Status ValidateCurrentDeviceLocked() const;
   Status RequireReady() const;
+  void MarkAllocationFailedLocked(AllocationFailureStage stage, uintptr_t allocation_base,
+                                  uint64_t allocation_bytes) noexcept;
   int32_t RootRankForDfx() const noexcept;
   void RecordFailure(DfxOperation operation, DfxPhase phase, int32_t root_rank, const Status &error, const char *file,
                      int line);
@@ -135,6 +145,7 @@ class Runtime final {
   std::optional<AllocationRegistry> allocations_;
   std::optional<Config> config_;
   std::optional<DfxFailure> latest_failure_;
+  std::optional<AllocationFailure> allocation_failure_;
   // Diagnostics only: leaked Allocations recorded this lifecycle, cleared when the lifecycle ends.
   std::vector<AllocationRecord> leaked_allocations_;
   uint64_t next_allocation_id_{1};

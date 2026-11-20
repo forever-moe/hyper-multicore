@@ -24,6 +24,7 @@ import torch
 import torch.distributed as dist
 
 from hyper_multicore import _automatic, shmem
+from hyper_multicore.shmem import _lifecycle
 from hyper_multicore._device import device_core_limit
 
 from .capability import require_capability
@@ -160,8 +161,9 @@ class HotReplica:
                 _automatic.register(self.close, self.ep_group)
             try:
                 pool.allocate()
-            except Exception:
-                pool.close()
+            except Exception as error:
+                if not _lifecycle._is_runtime_unavailable(error):  # pylint: disable=protected-access
+                    pool.close()
                 raise
             self._banks[geometry] = pool
             return pool

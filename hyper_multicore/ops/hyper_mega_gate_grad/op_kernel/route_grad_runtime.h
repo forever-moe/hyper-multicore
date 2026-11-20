@@ -11,23 +11,13 @@
 
 template <typename TilingData>
 __aicore__ inline bool IsRouteGradRuntimeValid(__gm__ uint8_t *runtime, const TilingData &tiling) {
-  const uint32_t task_capacity = MulticoreRuntime::getRuntimeTaskCapacity(runtime);
-  const uint64_t required_runtime_bytes = static_cast<uint64_t>(MulticoreRuntime::getVectorTaskIndexsOffset(runtime)) +
-                                          static_cast<uint64_t>(task_capacity) * sizeof(int32_t);
-  const uint64_t required_profile_bytes =
-    static_cast<uint64_t>(MulticoreRuntime::getCubeWorkerCapacity(runtime)) *
-      (sizeof(MulticoreRuntime::CycleTraceCoreHeader) +
-       MulticoreRuntime::getAicProfileRecordCapacity(runtime) * sizeof(MulticoreRuntime::CycleTraceRecord)) +
-    static_cast<uint64_t>(2 * MulticoreRuntime::getCubeWorkerCapacity(runtime)) *
-      (sizeof(MulticoreRuntime::CycleTraceCoreHeader) +
-       MulticoreRuntime::getAivProfileRecordCapacity(runtime) * sizeof(MulticoreRuntime::CycleTraceRecord));
+  if (!MulticoreRuntime::isAivPipelineStorageValid(runtime, tiling.runtimeConfigBytes,
+                                                  tiling.diagnosticBufferBytes)) return false;
   return tiling.activeAivWorkerCount > 0 && tiling.activeAivWorkerCount <= tiling.aivWorkerSlotCapacity &&
          tiling.activeAivWorkerCount <= MulticoreRuntime::getNumWorkers(runtime) && tiling.stageCount > 0 &&
          MulticoreRuntime::getTaskNum(runtime) == tiling.stageCount &&
          MulticoreRuntime::getTaskIndexNumByTaskType(runtime, MulticoreRuntime::TaskAiCoreType::TASK_AICORE_VECTOR) ==
-           static_cast<int32_t>(tiling.stageCount) &&
-         required_runtime_bytes <= tiling.runtimeConfigBytes &&
-         (!MulticoreRuntime::isCycleProfileEnabled(runtime) || required_profile_bytes <= tiling.diagnosticBufferBytes);
+           static_cast<int32_t>(tiling.stageCount);
 }
 
 #endif  // HYPER_MEGA_GATE_ROUTE_GRAD_RUNTIME_H

@@ -94,25 +94,14 @@ extern "C" __global__ __aicore__ void hyper_mega_gate_route(GM_ADDR logits, GM_A
   GET_TILING_DATA(tiling_data, tiling);
   const uint32_t worker_id = GetBlockIdx();
   auto *runtime = reinterpret_cast<__gm__ uint8_t *>(runtime_config);
-  const uint32_t task_capacity = MulticoreRuntime::getRuntimeTaskCapacity(runtime);
-  const uint64_t required_runtime_bytes = static_cast<uint64_t>(MulticoreRuntime::getVectorTaskIndexsOffset(runtime)) +
-                                          static_cast<uint64_t>(task_capacity) * sizeof(int32_t);
-  const uint64_t required_profile_bytes =
-    static_cast<uint64_t>(MulticoreRuntime::getCubeWorkerCapacity(runtime)) *
-      (sizeof(MulticoreRuntime::CycleTraceCoreHeader) +
-       MulticoreRuntime::getAicProfileRecordCapacity(runtime) * sizeof(MulticoreRuntime::CycleTraceRecord)) +
-    static_cast<uint64_t>(2 * MulticoreRuntime::getCubeWorkerCapacity(runtime)) *
-      (sizeof(MulticoreRuntime::CycleTraceCoreHeader) +
-       MulticoreRuntime::getAivProfileRecordCapacity(runtime) * sizeof(MulticoreRuntime::CycleTraceRecord));
-  if (tiling_data.activeAivWorkerCount == 0 || worker_id >= tiling_data.activeAivWorkerCount ||
+  if (!MulticoreRuntime::isAivPipelineStorageValid(runtime, tiling_data.runtimeConfigBytes,
+                                                  tiling_data.diagnosticBufferBytes) ||
+      tiling_data.activeAivWorkerCount == 0 || worker_id >= tiling_data.activeAivWorkerCount ||
       tiling_data.activeAivWorkerCount > tiling_data.aivWorkerSlotCapacity ||
       tiling_data.activeAivWorkerCount > MulticoreRuntime::getNumWorkers(runtime) ||
       tiling_data.stageCount != kRouteStageCount || MulticoreRuntime::getTaskNum(runtime) != kRouteStageCount ||
       MulticoreRuntime::getTaskIndexNumByTaskType(runtime, MulticoreRuntime::TaskAiCoreType::TASK_AICORE_VECTOR) !=
-        static_cast<int32_t>(kRouteStageCount) ||
-      required_runtime_bytes > tiling_data.runtimeConfigBytes ||
-      (MulticoreRuntime::isCycleProfileEnabled(runtime) &&
-       required_profile_bytes > tiling_data.diagnosticBufferBytes)) {
+        static_cast<int32_t>(kRouteStageCount)) {
     Trap();
   }
 

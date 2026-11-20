@@ -470,6 +470,50 @@ __aicore__ inline uint32_t getAivProfileRecordCapacity(__gm__ uint8_t *tiling) {
   return (*(__gm__ uint32_t *)(tiling + 7 * UINT32_T_SIZE));
 }
 
+constexpr uint32_t CYCLE_TRACE_RESERVED_WORDS = 9;
+
+struct CycleTraceCoreHeader {
+  uint64_t entryCycle;
+  uint32_t recordCount;
+  uint32_t droppedCount;
+  uint32_t coreType;
+  uint32_t blockId;
+  uint32_t recordCapacity;
+  uint32_t reserved[CYCLE_TRACE_RESERVED_WORDS];
+};
+
+struct CycleTraceRecord {
+  uint64_t startCycle;
+  uint64_t endCycle;
+  uint32_t descId;
+  uint32_t taskId;
+  uint32_t stageTaskIndex;
+  uint32_t ownerId;
+};
+
+static_assert(sizeof(CycleTraceCoreHeader) == 64, "Unexpected cycle trace core header size");
+static_assert(sizeof(CycleTraceRecord) == 32, "Unexpected cycle trace record size");
+
+// Broadcast AIV pipelines consume the header, task descriptors and vector index queue.
+// Validate their storage before dynamic reads; the existing readers use 32-bit offsets.
+__aicore__ inline bool isAivPipelineStorageValid(__gm__ uint8_t *runtime, uint64_t bytes,
+                                                 uint64_t diagnostic_bytes) {
+  if (bytes < sizeof(RuntimeHeader) || bytes >= RUNTIME_ADDRESS_SPACE_BYTES) return false;
+  const uint64_t capacity = getRuntimeTaskCapacity(runtime);
+  const uint64_t events = getRuntimeEventCapacity(runtime);
+  const uint64_t counts_offset = sizeof(RuntimeHeader) +
+    events * (INT32_T_SIZE + sizeof(EventDesc)) + capacity * sizeof(TaskDesc);
+  const uint64_t vector_end = counts_offset + 4 * INT32_T_SIZE + 2 * capacity * INT32_T_SIZE;
+  if (capacity == 0 || getTaskNum(runtime) > capacity ||
+      vector_end >= RUNTIME_ADDRESS_SPACE_BYTES || vector_end > bytes) return false;
+  if (!isCycleProfileEnabled(runtime)) return true;
+  const uint64_t aic_bytes = sizeof(CycleTraceCoreHeader) +
+    static_cast<uint64_t>(getAicProfileRecordCapacity(runtime)) * sizeof(CycleTraceRecord);
+  const uint64_t aiv_bytes = sizeof(CycleTraceCoreHeader) +
+    static_cast<uint64_t>(getAivProfileRecordCapacity(runtime)) * sizeof(CycleTraceRecord);
+  return getCubeWorkerCapacity(runtime) <= diagnostic_bytes / (aic_bytes + 2 * aiv_bytes);
+}
+
 __aicore__ inline int64_t getExtraValueFromTiling(__gm__ uint8_t *tiling, uint32_t index) {
   return (*(__gm__ int64_t *)(tiling + index * INT64_T_SIZE));
 }

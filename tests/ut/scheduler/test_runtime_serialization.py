@@ -15,6 +15,9 @@
 """Dense runtime serialization and production C++ reader layout."""
 
 import ctypes
+import mmap
+import os
+import resource
 import shutil
 import struct
 import subprocess
@@ -216,11 +219,14 @@ class TestRuntimeCppReader(unittest.TestCase):
             include_root = Path(hyper_multicore.__file__).resolve().parent.parent
             subprocess.run([
                 compiler, "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
-                "-I", str(include_root), str(Path(__file__).with_name("runtime_reader.cpp")), "-o", str(library),
+                "-I", str(include_root), "-I", str(include_root / "hyper_multicore/ops"),
+                str(Path(__file__).with_name("runtime_reader.cpp")), "-o", str(library),
             ], check=True)
             cls.reader = ctypes.CDLL(str(library))
         cls.reader.valid_runtime.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.c_uint64]
         cls.reader.valid_runtime.restype = ctypes.c_bool
+        cls.reader.valid_route_grad.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+        cls.reader.valid_route_grad.restype = ctypes.c_bool
         cls.reader.valid_ready_runtime.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint32]
         cls.reader.valid_ready_runtime.restype = ctypes.c_bool
         cls.reader.valid_expert_runtime.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64]
@@ -240,6 +246,37 @@ class TestRuntimeCppReader(unittest.TestCase):
         cls.reader.valid_runtime_from_launch.restype = ctypes.c_bool
         cls.reader.read_transport_and_kernel_task_types.argtypes = [ctypes.POINTER(ctypes.c_uint32)]
         cls.reader.read_transport_and_kernel_task_types.restype = None
+
+    def test_route_grad_rejects_truncated_storage_before_reading(self) -> None:
+        """Reject malformed buffers at a protected page without accessing their missing bytes."""
+        cfg = allocate_runtime_config(16)
+        cfg.task_num = 2
+        cfg.num_workers = 48
+        cfg.task_index_num[1] = 2
+        cfg.vector_task_indices[0], cfg.vector_task_indices[1] = 0, 1
+        image = serialize_runtime_config(cfg)
+        overflow = bytearray(image[:64])
+        struct.pack_into("<I", overflow, 8, 0xFFFFFFFF)
+        for data, valid in ((b"", False), (image[:11], False), (image[:64], False),
+                            (bytes(overflow), False), (image, True)):
+            with self.subTest(bytes=len(data)):
+                child = os.fork()
+                if child == 0:
+                    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+                    pages = (len(data) + mmap.PAGESIZE - 1) // mmap.PAGESIZE + 1
+                    storage = mmap.mmap(-1, pages * mmap.PAGESIZE)
+                    base = ctypes.addressof(ctypes.c_char.from_buffer(storage))
+                    guard = base + (pages - 1) * mmap.PAGESIZE
+                    libc = ctypes.CDLL(None)
+                    libc.mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+                    if libc.mprotect(guard, mmap.PAGESIZE, 0) != 0:
+                        os._exit(2)
+                    pointer = guard - len(data)
+                    ctypes.memmove(pointer, data, len(data))
+                    os._exit(0 if self.reader.valid_route_grad(pointer, len(data)) == valid else 1)
+                _, status = os.waitpid(child, 0)
+                self.assertEqual(os.waitstatus_to_exitcode(status), 0,
+                                 "runtime validation accessed missing storage or returned the wrong result")
 
     def test_mega_moe_task_encodings_match_cpp(self) -> None:
         """Named payloads keep their existing wire values on both sides of the ABI."""

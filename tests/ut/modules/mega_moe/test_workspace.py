@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 import torch
 
 from hyper_multicore import _collective
+from hyper_multicore.shmem import _api, _lifecycle
 from hyper_multicore.modules.mega_moe import workspace as workspace_module
 from hyper_multicore.modules.mega_moe.heap_manager import _HeapManager, _workspace_layout
 from hyper_multicore.modules.mega_moe.spec import (
@@ -41,6 +42,33 @@ from tests.common.mark_utils import arg_mark
 
 class TestMegaMoeWorkspaceSizing(unittest.TestCase):
     """Validate SHMEM planning without allocating accelerator memory."""
+
+    def test_terminal_allocation_failure_stops_cleanup_and_shared_reuse(self) -> None:
+        """An unpublished allocation failure must reach the launcher before any collective rollback."""
+        spec = SimpleNamespace(apply_probs_before_fc2=False, receive_capacity=128, routed_slots=256,
+                               hidden_size=16, ep_size=2, num_experts=8, dispatch_mode="push")
+        manager = _HeapManager(None, torch.empty(0))
+        workspace = MegaMoeWorkspace(shared=True)
+        workspace.heap_manager = manager
+        error = MemoryError("Tensor publication failed")
+        native = SimpleNamespace(_empty=Mock(side_effect=[torch.empty(1), error]),
+                                 _allocation_failed=Mock(return_value=True))
+        with patch.object(_lifecycle, "_runtime_invalidated", False), \
+                patch.object(_api, "_torch_modules", return_value=(torch, object())), \
+                patch.object(_api, "_load_native", return_value=native), \
+                patch.object(workspace_module.shmem, "free") as free, \
+                patch.object(_collective, "exchange") as exchange:
+            with self.assertRaises(MemoryError) as raised:
+                workspace.ensure(spec, torch.float32, torch.device("cpu"))
+            self.assertIs(raised.exception, error)
+            free.assert_not_called()
+            exchange.assert_not_called()
+            self.assertEqual(manager.state, "failed")
+            with self.assertRaisesRegex(RuntimeError, "restart the process"):
+                workspace.ensure(spec, torch.float32, torch.device("cpu"))
+            with self.assertRaisesRegex(RuntimeError, "restart the process"):
+                workspace.close()
+            exchange.assert_not_called()
 
     @arg_mark(plat_marks=["cpu_linux", "cpu_macos"], level_mark="level0",
               card_mark="allcards", essential_mark="essential")

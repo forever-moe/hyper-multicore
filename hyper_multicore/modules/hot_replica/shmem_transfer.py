@@ -98,7 +98,9 @@ class SharedExpertPool:
 
     def allocate(self) -> None:
         """Allocate after the caller has acquired the runtime and reserved capacity."""
-        _collective.collective_call(self._allocate, stage="HotReplica bank construction", group=self.group)
+        _lifecycle._reconfiguration_stage(  # pylint: disable=protected-access
+            self._allocate, action="HotReplica bank", stage="Construction", root_group=self.group,
+        )
 
     def _allocate(self) -> None:
         """Allocate persistent symmetric weight banks outside inference mode."""

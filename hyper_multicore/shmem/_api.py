@@ -33,7 +33,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from ._debug import _log_allocation_site
-from ._lifecycle import _host_barrier, _runtime_access
+from ._lifecycle import _host_barrier, _invalidate_on_allocation_failure, _runtime_access
 from ._runtime import _load_native, _torch_modules
 
 if TYPE_CHECKING:
@@ -101,11 +101,12 @@ def empty(
     torch, _ = _torch_modules()
     shape = _normalize_size(size)
     effective_dtype = torch.get_default_dtype() if dtype is None else dtype
-    tensor = _load_native()._empty(  # pylint: disable=protected-access
-        shape,
-        effective_dtype,
-        _normalize_alignment(alignment),
-    )
+    native = _load_native()
+    try:
+        tensor = native._empty(shape, effective_dtype, _normalize_alignment(alignment))  # pylint: disable=protected-access
+    except Exception:  # pylint: disable=broad-exception-caught
+        _invalidate_on_allocation_failure(native)
+        raise
     _log_allocation_site(tensor)
     return tensor
 
