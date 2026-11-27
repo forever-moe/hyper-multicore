@@ -96,10 +96,26 @@ def validate_weights(module, weights, hidden):
             raise ValueError("MX physical weights and hidden states must share a device")
 
 
-def forward(module, hidden_states, hidden_flat, topk_ids, topk_weights, weights, resources, route):
+def validate_shared_weights(module, weights, hidden):
+    """Check the local Dense weights in their original output-by-input layout."""
+    h, width = module.hidden_size, module.shared_intermediate_size
+    weight1, weight2 = weights
+    for root, shape in ((weight1, (2 * width, h)), (weight2, (h, width))):
+        if not isinstance(root, torch.Tensor) or tuple(root.shape) != shape:
+            raise ValueError(f"shared_expert_weights must contain Dense roots of shapes {(2 * width, h)} and {(h, width)}")
+        if root.device != hidden.device:
+            raise ValueError("MX shared expert weights and hidden states must share a device")
+        MXFP8ExpertWeightBinding(root, (1, *shape), forward_axis="row").resolve("forward")
+
+
+def forward(module, hidden_states, hidden_flat, topk_ids, topk_weights, weights, resources, route,
+            *, shared_expert_weights=None):
     """Launch MX experts over the route already prepared by the frontend."""
     del hidden_flat, topk_ids
     shapes = ((module.local_experts, module.hidden_size, 2 * module.intermediate_size),
               (module.local_experts, module.intermediate_size, module.hidden_size))
     execution = MXFP8Execution(resources, nograd_no_clone=module.nograd_no_clone)
-    return execute_mxfp8_experts(hidden_states, *weights, route, topk_weights, shapes, execution)
+    args = (hidden_states, *weights, route, topk_weights, shapes, execution)
+    if shared_expert_weights is None:
+        return execute_mxfp8_experts(*args)
+    return execute_mxfp8_experts(*args, shared_expert_weights=shared_expert_weights)

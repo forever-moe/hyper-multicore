@@ -47,13 +47,23 @@ class _MXFP8ExpertsFunction(torch.autograd.Function):
         shapes: tuple[tuple[int, int, int], tuple[int, int, int]],
         execution: Any,
         grad_enabled: bool,
+        shared_root1: torch.Tensor | None,
+        shared_root2: torch.Tensor | None,
     ) -> torch.Tensor:
         """Run the MX graph and retain this invocation when gradients are required."""
         ctx.weight1 = MXFP8ExpertWeightBinding(root1, shapes[0])
         ctx.weight2 = MXFP8ExpertWeightBinding(root2, shapes[1])
+        ctx.shared_weights = None
+        shared_weights = None
+        if shared_root1 is not None:
+            shared_w1 = MXFP8ExpertWeightBinding(shared_root1, (1, *shared_root1.shape), forward_axis="row")
+            shared_w2 = MXFP8ExpertWeightBinding(shared_root2, (1, *shared_root2.shape), forward_axis="row")
+            ctx.shared_weights = shared_w1, shared_w2
+            shared_weights = shared_w1.resolve('forward'), shared_w2.resolve('forward')
         retain_backward = grad_enabled and any(ctx.needs_input_grad)
         state = execution.forward(
-            hidden, route, probs, ctx.weight1.resolve('forward'), ctx.weight2.resolve('forward'), retain_backward,
+            hidden, route, probs, ctx.weight1.resolve('forward'), ctx.weight2.resolve('forward'),
+            retain_backward, shared_weights,
         )
         ctx.execution = execution
         ctx.execution_metadata = state.metadata
@@ -70,16 +80,24 @@ class _MXFP8ExpertsFunction(torch.autograd.Function):
         # Never reuse the forward-only physical views held by native launch code.
         weight1 = ctx.weight1.resolve('backward')
         weight2 = ctx.weight2.resolve('backward')
-        dx, dp, dw1, dw2 = ctx.execution.backward(
-            gradient, ctx.saved_tensors, ctx.execution_metadata, weight1, weight2,
+        shared_weights = None
+        if ctx.shared_weights is not None:
+            shared_w1, shared_w2 = ctx.shared_weights
+            shared_weights = shared_w1.resolve('backward'), shared_w2.resolve('backward')
+        dx, dp, dw1, dw2, shared_grads = ctx.execution.backward(
+            gradient, ctx.saved_tensors, ctx.execution_metadata, weight1, weight2, shared_weights,
         )
+        dw_shared1, dw_shared2 = None, None
+        if shared_grads is not None:
+            dw_shared1, dw_shared2 = (grad.reshape(binding.root.shape).to(dtype=binding.root.dtype)
+                                      for binding, grad in zip(ctx.shared_weights, shared_grads))
         dw1 = dw1.reshape(ctx.weight1.root.shape).to(dtype=ctx.weight1.root.dtype)
         dw2 = dw2.reshape(ctx.weight2.root.shape).to(dtype=ctx.weight2.root.dtype)
         # The native autograd task owns the retain_graph flag.
         # pylint: disable-next=protected-access
         if ctx.workspace is not None and not torch._C._autograd._get_current_graph_task_keep_graph():
             ctx.workspace.release_graph(ctx)
-        return dx, dw1, dw2, None, dp, None, None, None
+        return dx, dw1, dw2, None, dp, None, None, None, dw_shared1, dw_shared2
 
 
 def execute_mxfp8_experts(
@@ -90,12 +108,15 @@ def execute_mxfp8_experts(
     probs: torch.Tensor,
     shapes: tuple[tuple[int, int, int], tuple[int, int, int]],
     execution: Any,
+    *,
+    shared_expert_weights: tuple[torch.Tensor, torch.Tensor] | None = None,
 ) -> torch.Tensor:
     """Keep root identity across phases and expose physical execution to autograd.
 
-    ``execution.forward`` consumes current column-only weight storage and returns
-    MXFP8ForwardState. ``execution.backward`` receives freshly resolved dual-axis
-    weights and returns dX, dProbs, dW1, dW2. Neither interface may retain a weight
-    view as an assumption about the next FSDP phase.
+    Each phase resolves the axis consumed by its routed and shared GEMMs.
+    Keep the trainable roots as explicit autograd inputs.
     """
-    return _MXFP8ExpertsFunction.apply(hidden, root1, root2, route, probs, shapes, execution, torch.is_grad_enabled())
+    return _MXFP8ExpertsFunction.apply(
+        hidden, root1, root2, route, probs, shapes, execution, torch.is_grad_enabled(),
+        *(shared_expert_weights or (None, None)),
+    )

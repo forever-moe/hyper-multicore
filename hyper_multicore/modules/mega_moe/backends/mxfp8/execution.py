@@ -35,6 +35,46 @@ def _quantized_buffers(rows: int, columns: int, experts: int, device: Any) -> tu
     )
 
 
+def _shared_quant_buffers(name, rows, columns, device):
+    keys = (f'{name}_row', f'{name}_row_scale', f'{name}_col', f'{name}_col_scale')
+    return dict(zip(keys, _quantized_buffers(rows, columns, 1, device)))
+
+
+def _shared_forward_buffers(hidden, width, weight1, weight2):
+    h, device = hidden.shape[-1], hidden.device
+    source = hidden.reshape(-1, h).contiguous()
+    rows = source.shape[0]
+    return {
+        'group': torch.full((1,), rows, dtype=torch.int64, device=device),
+        'w1': weight1.row_data, 'w1_scale': weight1.row_scale,
+        'w2': weight2.row_data, 'w2_scale': weight2.row_scale,
+        'x': source, 'gate_up': torch.empty((rows, 2 * width), dtype=torch.bfloat16, device=device),
+        'output': torch.empty_like(source),
+        **_shared_quant_buffers('x', rows, h, device),
+        **_shared_quant_buffers('activation', rows, width, device),
+    }
+
+
+def _shared_backward_buffers(dy, width, dtype, saved, weight1, weight2):
+    rows, h = dy.shape
+    device = dy.device
+    group, x_col, x_scale, a_col, a_scale, gate_up = saved
+    return {
+        'group': group,
+        'w1': weight1.col_data, 'w1_scale': weight1.col_scale,
+        'w2': weight2.col_data, 'w2_scale': weight2.col_scale,
+        'dy': dy, 'gate_up': gate_up,
+        'x_col': x_col, 'x_col_scale': x_scale,
+        'activation_col': a_col, 'activation_col_scale': a_scale,
+        'da': torch.empty((rows, width), dtype=torch.bfloat16, device=device),
+        'dx': torch.empty_like(dy),
+        'dw1': torch.empty((2 * width, h), dtype=dtype, device=device),
+        'dw2': torch.empty((h, width), dtype=dtype, device=device),
+        **_shared_quant_buffers('dy', rows, h, device),
+        **_shared_quant_buffers('du', rows, 2 * width, device),
+    }
+
+
 class MXFP8Execution:
     """Own one autograd invocation's orchestration while borrowing serial resources."""
 
@@ -63,7 +103,8 @@ class MXFP8Execution:
 
     def forward(self, hidden: torch.Tensor, route: PreparedTopKRoute, probs: torch.Tensor,
                 weight1: MXFP8PhysicalWeight, weight2: MXFP8PhysicalWeight,
-                retain_backward: bool) -> MXFP8ForwardState:
+                retain_backward: bool,
+                shared_weights: tuple[MXFP8PhysicalWeight, MXFP8PhysicalWeight] | None = None) -> MXFP8ForwardState:
         """Prepare MX operands and restore the forward output to token order."""
         resources, workspace = self.resources, self.resources.workspace
         spec, device = resources.spec, hidden.device
@@ -94,6 +135,10 @@ class MXFP8Execution:
                 x_row, x_scale, x_col, x_col_scale, a_scale, a_col, a_col_scale,
                 weight1.col_scale, weight2.col_scale, plan.forward.gmm, plan.forward.quant,
             ]
+            shared = None
+            if shared_weights is not None:
+                shared = _shared_forward_buffers(hidden, spec.shared_intermediate_size, *shared_weights)
+                buffers.extend(shared[name] for name in plan.forward.host.shared_buffer_names)
             events = workspace.prepare_event_counters(forward=True)
             self._launch(buffers, plan.forward, events, plan)
             expert_output = workspace.routed_buffer[:route.routed_tokens.shape[0]]
@@ -108,6 +153,14 @@ class MXFP8Execution:
                       route.unpermute_mapping, metadata.group_list, metadata.dispatch_target_off,
                       metadata.dispatch_src_off, metadata.dispatch_size, metadata.combine_target_off,
                       metadata.combine_src_off, metadata.combine_size) if retain_backward else ())
+            if shared is not None:
+                shared_output = shared['output']
+                output = (output + shared_output if spec.shared_expert_add_order == 'routed_first'
+                          else shared_output + output)
+                if retain_backward:
+                    saved += tuple(shared[name] for name in (
+                        'group', 'x_col', 'x_col_scale', 'activation_col', 'activation_col_scale', 'gate_up',
+                    ))
             return MXFP8ForwardState(
                 output.reshape_as(hidden), saved,
                 _ExecutionMetadata(plan, tuple(hidden.shape), route.routed_tokens.shape[0], probs.dtype), workspace,
@@ -117,12 +170,16 @@ class MXFP8Execution:
                 workspace.release()
 
     def backward(self, gradient: torch.Tensor, saved: tuple[torch.Tensor, ...], metadata: _ExecutionMetadata,
-                 weight1: MXFP8PhysicalWeight, weight2: MXFP8PhysicalWeight) -> tuple[torch.Tensor, ...]:
+                 weight1: MXFP8PhysicalWeight, weight2: MXFP8PhysicalWeight,
+                 shared_weights: tuple[MXFP8PhysicalWeight, MXFP8PhysicalWeight] | None = None
+                 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+                            tuple[torch.Tensor, torch.Tensor] | None]:
         """Run the backward graph on the saved route and current weights."""
         workspace, plan = self.resources.workspace, metadata.plan
         spec, device = plan.spec, gradient.device
         (x_col, x_col_scale, a_col, a_col_scale, up, expert_output, probs, mapping, group_list,
-         dispatch_target, dispatch_source, dispatch_size, combine_target, combine_source, combine_size) = saved
+         dispatch_target, dispatch_source, dispatch_size, combine_target, combine_source, combine_size,
+         *shared_saved) = saved
         capacity = x_col.shape[0]
         dy_row, dy_scale, dy_col, dy_col_scale = _quantized_buffers(
             capacity, spec.hidden_size, spec.local_experts, device)
@@ -141,9 +198,8 @@ class MXFP8Execution:
         dw2 = torch.zeros(weight2.logical_shape, dtype=partial_dtype, device=device)
         workspace.claim()
         try:
-            multicore_ops.mega_moe_unpermute_grad_out(
-                expert_output, gradient.reshape(-1, spec.hidden_size).contiguous(), mapping, probs, source, grad_probs,
-            )
+            dy = gradient.reshape(-1, spec.hidden_size).contiguous()
+            multicore_ops.mega_moe_unpermute_grad_out(expert_output, dy, mapping, probs, source, grad_probs)
             buffers = [
                 dispatch, dispatch_target * spec.hidden_size, workspace.source_buffer if pull else source,
                 dispatch_source * spec.hidden_size, dispatch_size * spec.hidden_size,
@@ -153,12 +209,23 @@ class MXFP8Execution:
                 a_col_scale, weight2.row_scale, du_scale, du_col, du_col_scale, weight1.row_scale, x_col_scale,
                 plan.backward.gmm, plan.backward.quant,
             ]
+            shared = None
+            if shared_weights is not None:
+                shared = _shared_backward_buffers(
+                    dy, spec.shared_intermediate_size, partial_dtype, shared_saved, *shared_weights,
+                )
+                buffers.extend(shared[name] for name in plan.backward.host.shared_buffer_names)
             events = workspace.prepare_event_counters(forward=False)
             self._launch(buffers, plan.backward, events, plan, direction="backward")
             grad_hidden = multicore_ops.moe_token_permute_grad(
                 workspace.routed_buffer[:metadata.source_rows], mapping,
                 gradient.numel() // spec.hidden_size, spec.top_k,
             )
-            return grad_hidden.reshape(metadata.hidden_shape), grad_probs.to(metadata.probs_dtype), dw1, dw2
+            shared_grads = None
+            if shared is not None:
+                grad_hidden = grad_hidden + shared['dx']
+                shared_grads = shared['dw1'], shared['dw2']
+            return (grad_hidden.reshape(metadata.hidden_shape), grad_probs.to(metadata.probs_dtype),
+                    dw1, dw2, shared_grads)
         finally:
             workspace.release()

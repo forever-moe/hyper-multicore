@@ -85,7 +85,7 @@ class SiTUGLUParameters:
 
 @dataclass(frozen=True)
 class MegaMoeNumericsOptions:
-    """Probability placement and partial weight-gradient precision.
+    """Probability placement, partial weight-gradient precision and shared output addition.
 
     Numerical choices are fixed for the executor. Before-FC2 weighting rounds
     activations to BF16, multiplies FP32 probabilities, then rounds to BF16
@@ -94,3 +94,4 @@ class MegaMoeNumericsOptions:
 
     partial_weight_grad_dtype: Literal["native", "float32"] | None = None
     apply_probs_before_fc2: bool = False
+    shared_expert_add_order: Literal["routed_first", "shared_first"] = "routed_first"

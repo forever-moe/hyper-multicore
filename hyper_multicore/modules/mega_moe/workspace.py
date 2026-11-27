@@ -35,7 +35,7 @@ from hyper_multicore.scheduler.config import (
 from hyper_multicore.shmem import _lifecycle
 
 from .probability import PROBABILITY_PLANES, ProbabilityPlane
-from .spec import MegaMoeSpec, _resolve_receive_capacity
+from .spec import MegaMoeSpec, SHARED_EXPERT_EVENTS, _resolve_receive_capacity
 
 # The composed Cube-only GMM and SwiGLU-grad kernels do not use these
 # tensor arguments. Keep non-empty ABI placeholders; native tiling reserves
@@ -56,11 +56,12 @@ def _workspace_allocation_specs(
     dtype: torch.dtype,
     apply_probs_before_fc2: bool = False,
     compute_stages: int = 3,
+    local_events: int = 0,
 ) -> tuple[tuple[str, _lifecycle._AllocationSpec], ...]:  # pylint: disable=protected-access
     """Return the single ordered physical Allocation description for a workspace."""
     data_field = "source_buffer" if dispatch_mode == "pull" else "expert_buffer"
     data_rows = routed_slots if dispatch_mode == "pull" else receive_capacity
-    event_bytes = event_workspace_bytes(ep_size, num_experts, compute_stages)
+    event_bytes = event_workspace_bytes(ep_size, num_experts, compute_stages, local_events=local_events)
     allocation_spec = _lifecycle._AllocationSpec  # pylint: disable=protected-access
     allocations = (
         (data_field, allocation_spec((data_rows, hidden_size), dtype, _WORKSPACE_ALIGNMENT)),
@@ -98,6 +99,7 @@ def _spec_workspace_bytes(
         ep_size=specification["ep_size"],
         num_experts=specification["num_experts"],
         compute_stages=6 if specification.get("precision") == 'mxfp8' else 3,
+        local_events=SHARED_EXPERT_EVENTS if specification.get("shared_intermediate_size") else 0,
         dtype=dtype,
         apply_probs_before_fc2=specification.get("apply_probs_before_fc2", False),
     )
@@ -201,6 +203,7 @@ class MegaMoeWorkspace:
             ep_size=spec.ep_size,
             num_experts=spec.num_experts,
             compute_stages=6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
             dtype=dtype,
             apply_probs_before_fc2=spec.apply_probs_before_fc2,
         )
@@ -232,6 +235,7 @@ class MegaMoeWorkspace:
             ep_size=spec.ep_size,
             num_experts=spec.num_experts,
             compute_stages=6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
             dtype=dtype,
             apply_probs_before_fc2=spec.apply_probs_before_fc2,
         )
@@ -262,6 +266,7 @@ class MegaMoeWorkspace:
             ep_size=spec.ep_size,
             num_experts=spec.num_experts,
             compute_stages=6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
             dtype=dtype,
             apply_probs_before_fc2=spec.apply_probs_before_fc2,
         )
@@ -277,7 +282,10 @@ class MegaMoeWorkspace:
         self.expert_capacity = receive_capacity
         self.routed_slots = spec.routed_slots
         stages = 6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3
-        self.event_counter_bytes = mega_moe_event_capacity(spec.num_experts, spec.ep_size, stages) * 4
+        self.event_counter_bytes = mega_moe_event_capacity(
+            spec.num_experts, spec.ep_size, stages,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
+        ) * 4
         self.forward_ready_initialized = False
         self.backward_ready_initialized = False
 
@@ -297,6 +305,7 @@ class MegaMoeWorkspace:
             ep_size=spec.ep_size,
             num_experts=spec.num_experts,
             compute_stages=6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
             dtype=dtype,
             apply_probs_before_fc2=spec.apply_probs_before_fc2,
         )
@@ -371,6 +380,7 @@ class MegaMoeWorkspace:
             ep_size=spec.ep_size,
             num_experts=spec.num_experts,
             compute_stages=6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
             dtype=dtype,
             apply_probs_before_fc2=spec.apply_probs_before_fc2,
         )
@@ -380,7 +390,10 @@ class MegaMoeWorkspace:
         self.expert_capacity = requested_capacity
         self.routed_slots = spec.routed_slots
         stages = 6 if getattr(spec, "precision", "bf16") == "mxfp8" else 3
-        self.event_counter_bytes = mega_moe_event_capacity(spec.num_experts, spec.ep_size, stages) * 4
+        self.event_counter_bytes = mega_moe_event_capacity(
+            spec.num_experts, spec.ep_size, stages,
+            local_events=SHARED_EXPERT_EVENTS if getattr(spec, "shared_intermediate_size", None) else 0,
+        ) * 4
         try:
             for field_name, allocation in allocations:
                 setattr(self, field_name, shmem.empty(

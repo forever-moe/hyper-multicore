@@ -113,6 +113,8 @@ def _resolve_expert_options(precision, activation, numerics_options, tuning_opti
         raise ValueError("MegaMoE precision must be bf16 or mxfp8")
     if numerics.partial_weight_grad_dtype not in (None, "native", "float32"):
         raise ValueError("partial_weight_grad_dtype must be native, float32 or None")
+    if numerics.shared_expert_add_order not in ("routed_first", "shared_first"):
+        raise ValueError("shared_expert_add_order must be routed_first or shared_first")
     scheduler = validate_schedule_options(tuning.scheduler)
     _validate_precision_schedule(precision, scheduler)
     activation_parameters = _resolve_activation_parameters(activation)
@@ -159,6 +161,7 @@ class MegaMoeExperts(MulticoreModule):
         numerics_options: MegaMoeNumericsOptions | None = None,
         tuning_options: MegaMoeTuningOptions | None = None,
         expert_placement: MegaMoePlacementOptions | None = None,
+        shared_intermediate_size: int | None = None,
     ) -> None:
         """Initialize a parameterless lazy execution owner.
 
@@ -174,7 +177,7 @@ class MegaMoeExperts(MulticoreModule):
             precision: ``"bf16"`` for standard weights or ``"mxfp8"`` for external MX roots.
             activation: Immutable algorithm parameters. None selects ordinary SwiGLU.
                 Passing SiTUGLUParameters raises NotImplementedError at construction.
-            numerics_options: Probability placement and partial-gradient precision.
+            numerics_options: Probability placement, partial-gradient precision and shared output addition.
                 None uses after-FC2 probability weighting and native partial dW.
             expert_placement: Placement strategy and planner. Adaptive placement
                 requires A3 BF16 push execution and a multi-rank EP group.
@@ -182,6 +185,8 @@ class MegaMoeExperts(MulticoreModule):
                 ``hyper_multicore.experimental``. None selects the default policy.
                 Options are validated and copied into the instance configuration;
                 they do not change the chosen probability or clamp semantics.
+            shared_intermediate_size: Width of the local MXFP8 shared expert after activation.
+                None selects routed-only execution.
 
         Numerical choices and tuning options are fixed for this instance.
         Construct another executor to change them.
@@ -189,6 +194,12 @@ class MegaMoeExperts(MulticoreModule):
         numerics, tuning, scheduler, activation_parameters = _resolve_expert_options(
             precision, activation, numerics_options, tuning_options,
         )
+        if shared_intermediate_size is not None:
+            if precision != "mxfp8":
+                raise ValueError("The shared expert requires MXFP8 precision")
+            if (type(shared_intermediate_size) is not int
+                    or shared_intermediate_size <= 0 or shared_intermediate_size % 64):
+                raise ValueError("shared_intermediate_size must be a positive multiple of 64")
         planner = _placement_planner(expert_placement)
         if planner is not None and (precision != "bf16" or tuning.dispatch_mode != "push"):
             raise ValueError("HotReplica requires BF16 precision and push dispatch")
@@ -206,6 +217,8 @@ class MegaMoeExperts(MulticoreModule):
             "num_experts": num_experts,
             "top_k": top_k,
             "partial_weight_grad_dtype": numerics.partial_weight_grad_dtype,
+            "shared_intermediate_size": shared_intermediate_size,
+            "shared_expert_add_order": numerics.shared_expert_add_order,
             "activation_parameters": activation_parameters,
             "apply_probs_before_fc2": numerics.apply_probs_before_fc2,
             "ep_size": _resolve_ep_size(ep_group),
@@ -253,6 +266,7 @@ class MegaMoeExperts(MulticoreModule):
         self.nograd_no_clone = True
         self.hidden_size = specification["hidden_size"]
         self.intermediate_size = specification["intermediate_size"]
+        self.shared_intermediate_size = specification["shared_intermediate_size"]
         self.num_experts = specification["num_experts"]
         self.top_k = specification["top_k"]
         self.ep_size = specification["ep_size"]
@@ -454,12 +468,21 @@ class MegaMoeExperts(MulticoreModule):
         topk_weights: torch.Tensor,
         tokens_per_expert: torch.Tensor | None,
         expert_weights: tuple,
+        shared_expert_weights: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, bool]:
         """Defer rank-local weight errors until the binding or route collective."""
         try:
-            return self._validate_forward_inputs(
+            hidden_flat = self._validate_forward_inputs(
                 hidden_states, topk_ids, topk_weights, tokens_per_expert, expert_weights,
-            ), False
+            )
+            if (self.shared_intermediate_size is None) != (shared_expert_weights is None):
+                raise _InvalidExpertWeights("shared_expert_weights and shared_intermediate_size must be specified together")
+            if shared_expert_weights is not None:
+                try:
+                    self._backend.validate_shared_weights(self, shared_expert_weights, hidden_flat)
+                except (AttributeError, TypeError, ValueError, RuntimeError) as error:
+                    raise _InvalidExpertWeights(str(error)) from error
+            return hidden_flat, False
         except (_InvalidExpertWeights, _InvalidExpertWeightType):
             if self.ep_size == 1:
                 raise
@@ -478,6 +501,7 @@ class MegaMoeExperts(MulticoreModule):
         *,
         expert_weights: tuple[torch.Tensor, torch.Tensor],
         tokens_per_expert: torch.Tensor | None = None,
+        shared_expert_weights: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Route token states through the configured experts.
 
@@ -491,6 +515,7 @@ class MegaMoeExperts(MulticoreModule):
                 contiguous. MXFP8 accepts EIO roots with packed column data and
                 scales for forward, and packed row data and scales for backward.
             tokens_per_expert: Trusted exact global-expert histogram; skips histogram recomputation.
+            shared_expert_weights: Current local Dense MXFP8 root weights in EOI order.
 
         Note:
             Returns the input shape and dtype. EOI noncontiguity raises ValueError;
@@ -499,15 +524,18 @@ class MegaMoeExperts(MulticoreModule):
         """
         weights = expert_weights
         hidden_flat, weight_error = self._prepare_forward_inputs(
-            hidden_states, topk_ids, topk_weights, tokens_per_expert, weights,
+            hidden_states, topk_ids, topk_weights, tokens_per_expert, weights, shared_expert_weights,
         )
         if torch.npu.is_current_stream_capturing():
             raise RuntimeError("MegaMoe push heap growth and dynamic tokens do not support graph capture")
         resources = self._get_execution_resources(hidden_flat)
-        with prepare_expert_invocation(hidden_flat, topk_ids, topk_weights, tokens_per_expert,
-                                       weights, resources, weight_error=weight_error, planner=self._planner) as route:
+        shared = {} if shared_expert_weights is None else {"shared_expert_weights": shared_expert_weights}
+        with prepare_expert_invocation(
+            hidden_flat, topk_ids, topk_weights, tokens_per_expert, weights, resources,
+            weight_error=weight_error, planner=self._planner, **shared,
+        ) as route:
             return self._backend.forward(
-                self, hidden_states, hidden_flat, topk_ids, topk_weights, weights, resources, route,
+                self, hidden_states, hidden_flat, topk_ids, topk_weights, weights, resources, route, **shared,
             )
 
     def _create_execution_resources(

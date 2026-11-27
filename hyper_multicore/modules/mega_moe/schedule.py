@@ -7,7 +7,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from hyper_multicore.experimental import MegaMoeSchedulerOptions
-from hyper_multicore.scheduler.config import TaskType
+from hyper_multicore.scheduler.config import TaskAiCoreType, TaskType
 from hyper_multicore.scheduler.runtime import serialize_runtime_config
 from hyper_multicore.scheduler.worker_queues import install_worker_queues
 from .transport import TRANSPORT_TASKS, transport_queues
@@ -141,7 +141,7 @@ def describe_schedule_policy(name):
             'architecture': 'arch35'}
 
 
-def configure_expert_queues(cfg, graph, spec, *, forward):
+def configure_expert_queues(cfg, graph, spec, *, forward, shared_tasks=()):
     """Compile a policy over fixed QP0 owners and serialize the existing queue ABI."""
     if spec.schedule_policy == 'auto':
         spec = replace(spec, schedule_policy=TWO_EXPERT_PIPELINE)
@@ -153,6 +153,11 @@ def configure_expert_queues(cfg, graph, spec, *, forward):
     vectors = transport_queues(cfg, spec, communication)
     for queue, compute in zip(vectors, math):
         queue.extend(compute)
+    for task_id in shared_tasks:
+        task = cfg.all_tasks[task_id]
+        lane = task.task_index % spec.num_cube_cores
+        queue = cubes[lane] if task.task_aicore_type == TaskAiCoreType.TASK_AICORE_CUBE else vectors[2 * lane]
+        queue.append(task_id)
     result = install_worker_queues(cfg, cubes, vectors, cube_ready_depth=spec.ready_depth or 0,
                                    vector_ready_depths=[(spec.ready_depth or 0) if i % 2 == 0 else 0
                                                         for i in range(2 * stages.cores)])

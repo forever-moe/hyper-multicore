@@ -44,7 +44,8 @@ EVENT_INVALID_ID         = 0xFFFFFFFF
 RUNTIME_PROTOCOL_VERSION = 1
 
 
-def mega_moe_event_capacity(num_experts: int, ep_size: int, compute_stages: int = 3) -> int:
+def mega_moe_event_capacity(num_experts: int, ep_size: int, compute_stages: int = 3, *,
+                            local_events: int = 0) -> int:
     """Reserve graph events and the complete atomic write at the last trigger.
 
     Args:
@@ -59,6 +60,8 @@ def mega_moe_event_capacity(num_experts: int, ep_size: int, compute_stages: int 
     # Ready and worker completion follow termination with separate atomic lanes.
     final_event = num_experts + compute_stages * (num_experts // ep_size) + 4 + ATOMIC_ADD_VALUE_LEN
     required = final_event + ATOMIC_ADD_VALUE_LEN
+    if local_events:
+        required += local_events + ATOMIC_ADD_VALUE_LEN - 1
     return max(MIN_EVENT_CAPACITY, (required + 15) // 16 * 16)
 
 
@@ -519,7 +522,8 @@ def configure_ready_handshake(cfg: RuntimeConfigC, tsv: TaskSplitValue) -> None:
     cfg.all_event_num_triggers[completion_event] = cfg.num_workers
 
 
-def event_workspace_bytes(ep_size: int, num_experts: int, compute_stages: int = 3) -> int:
+def event_workspace_bytes(ep_size: int, num_experts: int, compute_stages: int = 3, *,
+                          local_events: int = 0) -> int:
     """Return graph counters plus separate ready and completion generations.
 
     Args:
@@ -529,7 +533,9 @@ def event_workspace_bytes(ep_size: int, num_experts: int, compute_stages: int = 
     Returns:
         Required byte count for one direction's event workspace.
     """
-    counter_bytes = mega_moe_event_capacity(num_experts, ep_size, compute_stages) * ctypes.sizeof(ctypes.c_int32)
+    counter_bytes = mega_moe_event_capacity(
+        num_experts, ep_size, compute_stages, local_events=local_events,
+    ) * ctypes.sizeof(ctypes.c_int32)
     if ep_size <= 1:
         return counter_bytes
     return counter_bytes + 2 * (ep_size + 1) * READY_CACHE_LINE_BYTES

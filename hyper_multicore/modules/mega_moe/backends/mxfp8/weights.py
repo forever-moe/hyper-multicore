@@ -44,6 +44,7 @@ class MXFP8ExpertWeightBinding:
 
     root: torch.Tensor
     logical_shape: tuple[int, int, int]
+    forward_axis: Literal["row", "col"] = "col"
 
     def __post_init__(self) -> None:
         if not isinstance(self.root, torch.Tensor):
@@ -78,9 +79,12 @@ class MXFP8ExpertWeightBinding:
     def resolve(self, phase: Literal['forward', 'backward']) -> MXFP8PhysicalWeight:
         """Resolve only the axis consumed by the current execution phase."""
         if phase == 'forward':
-            data, scale = self._physical_pair('col')
+            axis = self.forward_axis
+        elif phase == 'backward':
+            axis = 'row' if self.forward_axis == 'col' else 'col'
+        else:
+            raise ValueError(f'MegaMoE MXFP8 phase must be forward/backward, got {phase!r}.')
+        data, scale = self._physical_pair(axis)
+        if axis == 'col':
             return MXFP8PhysicalWeight(self.logical_shape, col_data=data, col_scale=scale)
-        if phase == 'backward':
-            data, scale = self._physical_pair('row')
-            return MXFP8PhysicalWeight(self.logical_shape, row_data=data, row_scale=scale)
-        raise ValueError(f'MegaMoE MXFP8 phase must be forward/backward, got {phase!r}.')
+        return MXFP8PhysicalWeight(self.logical_shape, row_data=data, row_scale=scale)

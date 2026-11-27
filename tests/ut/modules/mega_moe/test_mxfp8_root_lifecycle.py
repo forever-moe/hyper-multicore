@@ -39,22 +39,24 @@ def test_fresh_physical_root_in_backward_and_no_grad_retention(row_only):
 
     class Execution:
         """Record which physical parameters each phase consumes."""
-        def forward(self, hidden, route, probabilities, w1, w2, retained):
+        def forward(self, hidden, route, probabilities, w1, w2, retained, shared):
             """Record the forward weight and retain the requested state."""
             del route, probabilities, w2
+            assert shared is None
             self.retained = retained
             assert w1.col_data.data_ptr() == roots[0].col_data.data_ptr()
             assert w1.row_data is None
             return MXFP8ForwardState(hidden.clone(), (), None)
 
-        def backward(self, grad, saved, metadata, w1, w2):
+        def backward(self, grad, saved, metadata, w1, w2, shared):
             """Check that backward consumes the newly materialized weights."""
             del saved, metadata
+            assert shared is None
             for weight, root in zip((w1, w2), roots):
                 assert weight.row_data.data_ptr() == root.row_data.data_ptr()
                 assert weight.row_scale.data_ptr() == root.row_scale.data_ptr()
                 assert weight.col_data is None and weight.col_scale is None
-            return grad, torch.zeros_like(probs), *(torch.zeros_like(root) for root in roots)
+            return grad, torch.zeros_like(probs), *(torch.zeros_like(root) for root in roots), None
 
     execution = Execution()
     y = execute_mxfp8_experts(x, *roots, None, probs, shapes, execution)

@@ -34,6 +34,7 @@ def prepare_expert_invocation(
     counts: torch.Tensor | None, weights: tuple[torch.Tensor, torch.Tensor],
     resources: "_MegaMoeExecutionResources", *, weight_error: bool = False,
     planner: "BasePlanner | None" = None,
+    shared_expert_weights: tuple[torch.Tensor, torch.Tensor] | None = None,
 ) -> Iterator[PreparedTopKRoute]:
     """Converge weight errors on the existing route collective before physical binding.
 
@@ -45,6 +46,9 @@ def prepare_expert_invocation(
         int(torch.is_grad_enabled()) | (int(hidden.requires_grad) << 1)
         | (int(weights[0].requires_grad) << 2) | (int(weights[1].requires_grad) << 3)
         | (int(probs.requires_grad) << 4))
+    if not weight_error and shared_expert_weights is not None:
+        shared_w1, shared_w2 = shared_expert_weights
+        mask |= (int(shared_w1.requires_grad) << 6) | (int(shared_w2.requires_grad) << 7)
     pull = resources.spec.dispatch_mode == "pull"
     claimed = False
 

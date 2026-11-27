@@ -30,6 +30,7 @@ class OpType(Enum):
     """Operator kinds supported by the multicore compute graph."""
 
     ALLTOALL    = "alltoall"
+    BARRIER     = "barrier"
     AIV_PIPELINE = "aiv_pipeline"
     GMM         = "gmm"
     QUANTIZE    = "quantize"

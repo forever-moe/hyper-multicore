@@ -31,6 +31,7 @@ from .numerics import SiTUGLUParameters, SwiGLUParameters
 
 _COMMUNICATION_SPLIT = 128
 _DEFAULT_CAPACITY_FACTOR = 1.25
+SHARED_EXPERT_EVENTS = 7  # Routed completion plus the six shared backward stages.
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,8 @@ class MegaMoeSpec:
     ready_depth: int | None = None
     schedule_policy: str = "auto"
     lowering: str = "auto"
+    shared_intermediate_size: int | None = None
+    shared_expert_add_order: str = "routed_first"
 
     @property
     def dynamic_tokens(self) -> bool:
@@ -240,4 +243,6 @@ def bind_mega_moe_spec(
         ready_depth=specification.get("ready_depth"),
         schedule_policy=specification.get("schedule_policy", "auto"),
         lowering=specification.get("lowering", "auto"),
+        shared_intermediate_size=specification.get("shared_intermediate_size"),
+        shared_expert_add_order=specification.get("shared_expert_add_order", "routed_first"),
     )

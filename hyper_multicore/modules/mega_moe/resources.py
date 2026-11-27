@@ -157,6 +157,7 @@ class _MegaMoeExecutionResources:
                   "num_experts", "top_k", "initial_capacity_factor", "capacity_growth_factor", "dispatch_mode",
                   "dispatch_split", "combine_split", "activation_parameters",
                   "apply_probs_before_fc2", "partial_weight_grad_dtype", "expert_weight_layout",
+                  "shared_intermediate_size", "shared_expert_add_order",
                   "ep_size", "auto_tokens",
                   "precision", "transport_engine", "ready_depth", "schedule_policy", "lowering",
                   "batch_experts", "nominal_schedule", "hot_replica", "source_token_bound", "planner_key")

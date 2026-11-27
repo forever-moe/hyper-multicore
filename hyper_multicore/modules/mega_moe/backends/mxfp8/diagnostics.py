@@ -36,8 +36,10 @@ class MxProfileOwnerContext:
     spec: Any
 
 
-def resolve_mx_profile_owner(operator: Any, task: Any, context: MxProfileOwnerContext) -> int:
+def resolve_mx_profile_owner(operator: Any, task: Any, context: MxProfileOwnerContext) -> int | None:
     """Map the profiled native task to its global expert."""
+    if operator.name.startswith("shared_"):
+        return None
     spec = context.spec
     base = spec.rank_id * spec.local_experts
     if operator.name in ('dispatch', 'combine'):

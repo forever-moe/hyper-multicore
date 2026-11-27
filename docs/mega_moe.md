@@ -99,7 +99,8 @@ MegaMoE 不接受 TP 大小参数。
 | `top_k` | 必填 | 每个 token 选择的专家数 K |
 | `ep_group` | `None` | 独立单 rank 可省略；分布式作业显式指定 EP 组 |
 | `precision` | `"bf16"` | 可选 `"bf16"` 或 `"mxfp8"`，硬件与权重要求见精度支持 |
-| `numerics_options` | `None` | 默认不裁剪、FC2 后加权，完整字段见数值配置 |
+| `numerics_options` | `None` | FC2 后加权，原生 partial dW 精度，路由输出在共享加法左侧 |
+| `shared_intermediate_size` | `None` | 一个本地 MXFP8 共享专家的 SwiGLU 中间维度，启用时取 64 的正整数倍 |
 | `tuning_options` | `None` | 使用默认执行策略，公开实验配置见执行调优 |
 
 本地专家数为 E/EP，专家归属按组内 rank 顺序确定。同一进程的 SHMEM 同时只能绑定一组有序的 EP 成员。
@@ -118,6 +119,7 @@ MegaMoE 不接受 TP 大小参数。
 | `topk_weights` | `[T, K]` | 浮点路由概率；参与专家结果加权，可回传梯度 |
 | `expert_weights` | 两个本地权重组成的 tuple | 每次调用必填；BF16 布局见下文，MXFP8 物理权重见精度支持 |
 | `tokens_per_expert` | `[E]` | 可选的 INT32/INT64 精确本 rank histogram |
+| `shared_expert_weights` | `([2I_s,H], [H,I_s])` | 启用共享专家时每次传入当前的 Dense MXFP8 权重根 |
 | 返回的 `output` | 与 `hidden_states` 相同 | 保持输入 shape 和 BF16 dtype，恢复到原 token 顺序 |
 
 两种精度均按实际输入管理 token，各 rank 可不等长或为空。所有 EP rank 必须按相同顺序进入正反向，
@@ -199,6 +201,21 @@ M 和 N 必须均为 64 的倍数。root 上的物理字段按以下布局解释
 将当前物理字段更新到同一个原始 root 上；执行器保留 root，并在反向重新读取字段，
 不保存临时 view 来替代当前权重。权重准备的完整回放入口见
 [ascend950 独立回放](build.md#独立回放与队列诊断)。
+
+### MXFP8 共享专家
+
+在 `ascend950` 上设置 `shared_intermediate_size=I_s`，并在每次调用时传入
+`shared_expert_weights=(gate_up_weight, down_weight)`。共享专家对本 rank 的全部原始 token
+执行 SwiGLU FFN，独立于 `num_experts`、TopK 和路由权重。共享权重使用上述 MXFP8 root
+约定中的物理 dtype，按 Dense EOI 布局解释。前向需要 `row_data/row_scale`，反向需要
+当次 gather 后的 `col_data/col_scale`。共享专家沿用执行器的激活参数与 partial dW 精度。
+无 bias 的当前接口由调用方持有权重和相应的 FSDP 分组。
+
+本地路由 GEMM 结束后，同一个 kernel 继续执行共享 FFN，AIV1 并行发送剩余 Combine。
+执行器恢复路由输出的 token 顺序并加权，随后与共享结果相加，返回一个 BF16 输出。
+`MegaMoeNumericsOptions(shared_expert_add_order="routed_first")` 沿用路由加共享的顺序。
+`"shared_first"` 将共享输出放在最后一次加法的左侧。
+调用者在整个 EP 组内使用一致的共享配置和梯度参与方式。
 
 ### 通信与诊断支持
 

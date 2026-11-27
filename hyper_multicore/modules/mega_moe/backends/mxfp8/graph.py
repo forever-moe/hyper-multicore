@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Compose forward/backward expert DAGs from standard MX mathematical tasks."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from hyper_multicore.modules.mega_moe.numerics import validate_mxfp8_activation
 from hyper_multicore.scheduler.config import (TaskSplitValue,
@@ -28,7 +28,8 @@ from hyper_multicore.tasks.quantization_mxfp8 import (MX_QUANT_TASK, MX_SWIGLU_T
 from hyper_multicore.tasks.swiglu import encode_swiglu_clamp_limit
 from hyper_multicore.tasks.swiglu_mxfp8 import Mxfp8SwiGLUFillConfig
 from hyper_multicore.tasks.utils import add_dynamic_data, add_terminate
-from ...spec import MegaMoeSpec
+from ...spec import MegaMoeSpec, SHARED_EXPERT_EVENTS
+from .shared_expert import add_shared_expert, fill_shared_expert
 from ...schedule import configure_expert_queues
 
 
@@ -52,6 +53,7 @@ class MXFP8Runtime:
     buffer_count: int
     transport_schedule: str = 'QP1'
     native_operator: str = 'HyperMegaMoeMxfp8'
+    shared_buffer_names: tuple[str, ...] = ()
 
 
 def _add_compute(graph: ComputeGraph, name: str, specs: dict[int, TensorSpec],
@@ -159,16 +161,32 @@ def build_mxfp8_runtime(spec: MegaMoeSpec, *, forward: bool) -> MXFP8Runtime:
         order = ['dispatch', 'quant_dy', 'dw2', 'da', 'swiglu_grad_quant', 'dw1', 'dx', 'combine']
     for left, right in zip(order, order[1:]):
         graph.add_edge(left, right)
+    routed_ops = graph.topological_sort()
+    shared_ops, shared_buffers = (), ()
+    if spec.shared_intermediate_size is not None:
+        shared_ops, shared_buffers = add_shared_expert(
+            graph, spec, forward, specs, specs[gtable], specs[qtable], gmms, quants, clamp_bits,
+        )
     graph.propagate_splits(values)
     tasks = 1 + sum(op.task_num for op in graph.topological_sort())
-    event_capacity = mega_moe_event_capacity(spec.num_experts, spec.ep_size, compute_stages=6)
+    event_capacity = mega_moe_event_capacity(
+        spec.num_experts, spec.ep_size, compute_stages=6, local_events=SHARED_EXPERT_EVENTS if shared_ops else 0,
+    )
     cfg = allocate_runtime_config(tasks, event_capacity, spec.local_experts, num_workers=2 * cubes)
     init_task_split_value(values)
     values.rank_id = spec.rank_id
-    for op in graph.topological_sort():
+    for op in routed_ops:
         op.fill_config.fill(cfg, op, values)
     combine = graph.get_op('combine')
-    add_terminate(cfg, values, combine.task_num)
+    shared_tasks = range(0)
+    terminate_values = values
+    if shared_ops:
+        # The last routed GMM publishes one event per expert. Combine and the
+        # local join consume those events independently.
+        routed_events = range(values.pre_pre_event_num - spec.local_experts + 1, values.pre_pre_event_num + 1)
+        shared_tasks, vector_count = fill_shared_expert(cfg, values, shared_ops, routed_events)
+        terminate_values = replace(values, pre_task_num=shared_tasks.stop, pre_vector_task_num=vector_count)
+    add_terminate(cfg, terminate_values, combine.task_num)
     middle_vectors = sum(graph.get_op(name).task_num for name in order
                          if name not in ('dispatch', 'combine') and graph.get_op(name).op_type
                          in (OpType.QUANTIZE, OpType.SWIGLU_QUANT, OpType.SWIGLU_GRAD_QUANT))
@@ -178,8 +196,8 @@ def build_mxfp8_runtime(spec: MegaMoeSpec, *, forward: bool) -> MXFP8Runtime:
     cfg.atomic_add_values[0] = 1
     configure_ready_handshake(cfg, values)
     validate_runtime_config(cfg, values, cubes)
-    cfg = configure_expert_queues(cfg, graph, spec, forward=forward)
+    cfg = configure_expert_queues(cfg, graph, spec, forward=forward, shared_tasks=shared_tasks)
     native_operator = 'HyperMegaMoeMxfp8' if forward else 'HyperMegaMoeMxfp8Grad'
     return MXFP8Runtime(graph, cfg, serialize_mx_gmm_descriptors(gmms),
-                        serialize_mx_quant_descriptors(quants), 27 if forward else 33,
-                        f'{spec.schedule_policy}/QP1', native_operator)
+                        serialize_mx_quant_descriptors(quants), len(specs) + len(shared_buffers),
+                        f'{spec.schedule_policy}/QP1', native_operator, shared_buffers)
