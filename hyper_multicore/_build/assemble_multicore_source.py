@@ -47,11 +47,13 @@ _KERNEL_INCLUDES = "common/inc/op_kernel"
 _MX_QUANT = "dynamic_mx_quant_with_dual_axis"
 _MX_SWIGLU = "swiglu_group_quant_with_dual_axis"
 _MX_SWIGLU_GRAD = "swiglu_backward_group_quant_with_dual_axis"
+_MX_QBMM = "matmul/quant_batch_matmul_v3/op_kernel/arch35"
 _MX_OPS_NN_PATHS = (
     _KERNEL_INCLUDES,
     f"quant/{_MX_QUANT}/op_kernel/arch35",
     f"activation/{_MX_SWIGLU}/op_kernel/arch35",
     f"activation/{_MX_SWIGLU_GRAD}/op_kernel/arch35",
+    _MX_QBMM,
 )
 _OPS_TRANSFORMER_MHC_PATHS = (
     "common/include",
@@ -180,6 +182,11 @@ def _compose_arch35_sources(source_root: Path, ops_nn: Path, mxfp8: Path, ops_te
     shutil.copytree(mxfp8 / _KERNEL_INCLUDES, target / _MX_QUANT / "inc")
     for operator in (_MX_SWIGLU, _MX_SWIGLU_GRAD):
         shutil.copytree(mxfp8 / "activation" / operator / "op_kernel/arch35", target / operator / "arch35")
+    qbmm = target / "quant_batch_matmul_v3"
+    qbmm.mkdir()
+    for name in ("qbmm_mx_without_batch_tensor_api_blaze.h", "qbmm_mx_l0c_pingpong.h",
+                 "quant_batch_matmul_v3_tiling_data.h"):
+        shutil.copy2(mxfp8 / _MX_QBMM / name, qbmm / name)
     # GroupQuant uses ../../inc from its arch35 headers.
     shutil.copytree(mxfp8 / _KERNEL_INCLUDES, target / "inc")
     files = {str(path.relative_to(target)): _sha256(path)

@@ -211,11 +211,35 @@ M 和 N 必须均为 64 的倍数。root 上的物理字段按以下布局解释
 当次 gather 后的 `col_data/col_scale`。共享专家沿用执行器的激活参数与 partial dW 精度。
 无 bias 的当前接口由调用方持有权重和相应的 FSDP 分组。
 
+共享专家的矩阵乘使用 CANN Dense `QuantBatchMatmulV3` 的无 batch Blaze 路径。
+使用已安装的 CANN OPP tiler 按真实本地 token 数生成 tiling，支持 Cube 单独执行的普通和 L0C
+ping-pong 分支。运行环境需要提供 `tbe.common.utils.op_tiling` 和与编译进 worker 的字段语义
+兼容的 tiling。worker 使用固定的 4-tile 滑窗，L0 分块由 kernel 推导。
+
 本地路由 GEMM 结束后，同一个 kernel 继续执行共享 FFN，AIV1 并行发送剩余 Combine。
 执行器恢复路由输出的 token 顺序并加权，随后与共享结果相加，返回一个 BF16 输出。
 `MegaMoeNumericsOptions(shared_expert_add_order="routed_first")` 沿用路由加共享的顺序。
 `"shared_first"` 将共享输出放在最后一次加法的左侧。
 调用者在整个 EP 组内使用一致的共享配置和梯度参与方式。
+
+#### 单卡逐 bit 回放
+
+在 Ascend950 上使用兼容的 CANN 9.2、PyTorch、TorchNPU 环境和 `cann_ops_nn` Torch 扩展，
+在源码根目录构建并激活该版本的 native payload。该扩展需注册 grouped dual-axis
+量化及 SwiGLU 前向和反向 dual-axis 量化算子。
+
+```bash
+source /path/to/cann/set_env.sh
+bash hyper_multicore/build.sh --soc-list ascend950 --jobs 16
+source build/native/payload/hyper_multicore/lib/set_env.bash
+python -m tests.torch._test_mega_moe_pangu_mxfp8_bitwise --output shared-bitwise.json
+```
+
+两个对照共用固定输入、路由和权重。参考路径直接调用 PanGu MXFP8 配方使用的 CANN 算子。
+对照分别为 MegaMoE 路由加独立共享专家，以及 MegaMoE 路由加融合共享专家。
+用例比较输出、输入梯度、路由概率梯度、路由及共享权重梯度。独立共享专家场景还比较相加前的
+路由输出和路由输入梯度。融合场景报告共享专家的中间结果及六个 Dense QBMM 的 tiling。
+可用 `--case separate` 或 `--case fused` 单独执行。该用例覆盖单卡专家计算与梯度，不涉及多卡通信、FSDP 和优化器。
 
 ### 通信与诊断支持
 

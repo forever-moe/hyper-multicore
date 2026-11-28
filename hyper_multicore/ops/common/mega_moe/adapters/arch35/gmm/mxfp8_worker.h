@@ -9,6 +9,9 @@
 #include "common/mega_moe/gmm_logical_workers.h"
 #include "blaze/gemm/block/block_mmad_qgmm_mx.h"
 #include "blaze/gemm/kernel/kernel_qgmm_mx.h"
+#include "runtime/runtime_config.hpp"
+#include "quant_batch_matmul_v3/qbmm_mx_l0c_pingpong.h"
+#include "quant_batch_matmul_v3/qbmm_mx_without_batch_tensor_api_blaze.h"
 
 namespace MulticoreMx {
 
@@ -56,13 +59,11 @@ __aicore__ inline void ExecuteMxGmmLayout(const MxGmmDescriptor& r, GM_ADDR x, G
   }
 }
 
-__aicore__ inline void ZeroMxWeightGradient(const MxGmmDescriptor& r, GM_ADDR y) {
-  const uint64_t words = static_cast<uint64_t>(r.m) * r.n *
-      (r.output_dtype == static_cast<uint32_t>(MxOutput::BF16) ? 2 : 4) / sizeof(uint32_t);
+__aicore__ inline void ZeroMxMatrix(uint64_t words, uint32_t index, uint32_t count, GM_ADDR y) {
   AscendC::GlobalTensor<uint32_t> output;
   output.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(y), words);
   // One logical worker owns each complete cache line, including its write-back.
-  for (uint64_t line = r.cube_index; line < (words + 15) / 16; line += r.cube_count) {
+  for (uint64_t line = index; line < (words + 15) / 16; line += count) {
     for (uint64_t i = line * 16; i < (line + 1) * 16 && i < words; ++i) {
       output.SetValue(i, 0);
     }
@@ -75,7 +76,9 @@ __aicore__ inline void ExecuteMxGmm(const MxGmmDescriptor& r, GM_ADDR x, GM_ADDR
                                    GM_ADDR xs, GM_ADDR ws, GM_ADDR y) {
   if (r.m == 0 || r.k == 0) {
     if (r.layout == static_cast<uint32_t>(MxLayout::TN)) {
-      ZeroMxWeightGradient(r, y);
+      const uint64_t bytes = r.output_dtype == static_cast<uint32_t>(MxOutput::BF16) ? 2 : 4;
+      ZeroMxMatrix(static_cast<uint64_t>(r.m) * r.n * bytes / sizeof(uint32_t),
+                   r.cube_index, r.cube_count, y);
     }
     return;
   }
@@ -156,6 +159,97 @@ __aicore__ inline void ExecuteMxGmmTask(const Task& task, GM_ADDR* inputs,
                inputs[r.x_scale_position] + r.x_scale_offset,
                inputs[r.w_scale_position] + r.w_scale_offset,
                inputs[task.outputs[0].input_position] + r.y_offset);
+}
+
+struct MxQbmmDescriptor {
+  uint64_t tiling_key;
+  uint32_t x_scale_position, w_scale_position, output_bytes, padding;
+  DequantBmm::QuantBatchMatmulV3TensorAPIWithoutBatchTilingData tiling;
+};
+static_assert(sizeof(MxQbmmDescriptor) == 88 && offsetof(MxQbmmDescriptor, tiling) == 24,
+              "Dense MXFP8 QBMM task descriptor ABI mismatch");
+
+template <class Out, class A, class B>
+__aicore__ inline void ExecuteQbmmKernel(const MxQbmmDescriptor& record, uint32_t lane, uint32_t cores,
+                                        GM_ADDR x, GM_ADDR w, GM_ADDR xs, GM_ADDR ws, GM_ADDR y) {
+  using ND = asc::te::nd_ext_layout_ptn;
+  using Fp8 = fp8_e4m3fn_t;
+  using Blaze::Gemm::A_FULL_LOAD_MODE;
+  const auto kind = (record.tiling_key >> 8) & 0xff;
+  const auto* tiling = &record.tiling;
+  AscendC::TPipe pipe;
+  if constexpr (sizeof(Out) == 2) {
+    if (kind == 9) {
+      QbmmMxL0CPingpongWithoutBatchTensorApiKernel<Fp8, Fp8, Out, A, B, ND>(
+        x, w, ws, nullptr, xs, y, tiling, lane, cores);
+      return;
+    }
+    if (kind == 10) {
+      QbmmMxL0CPingpongWithoutBatchTensorApiKernel<Fp8, Fp8, Out, A, B, ND, A_FULL_LOAD_MODE>(
+        x, w, ws, nullptr, xs, y, tiling, lane, cores);
+      return;
+    }
+  }
+  if (kind == 0) {
+    QbmmMxWithoutBatchTensorApiKernel<Fp8, Fp8, Out, A, B, ND>(
+      x, w, ws, nullptr, xs, y, tiling, lane, cores);
+  } else if (kind == 1) {
+    QbmmMxWithoutBatchTensorApiKernel<Fp8, Fp8, Out, A, B, ND, A_FULL_LOAD_MODE>(
+      x, w, ws, nullptr, xs, y, tiling, lane, cores);
+  } else {
+    AscendC::Trap();
+  }
+}
+
+__aicore__ inline void ExecuteMxQbmmTask(const MulticoreRuntime::TaskDesc& task, GM_ADDR* inputs,
+                                        const __gm__ MxLaunchDescriptor* launch) {
+  const uint32_t table = task.inputs[2].input_position;
+  const uint64_t offset = task.extra_value_0 * sizeof(MxQbmmDescriptor);
+  CheckMxRange(offset, sizeof(MxQbmmDescriptor), launch->buffer_bytes[table]);
+  const auto* source = reinterpret_cast<const __gm__ uint64_t*>(inputs[table] + offset);
+  MxQbmmDescriptor record;
+  auto* words = reinterpret_cast<uint64_t*>(&record);
+  for (uint32_t index = 0; index < sizeof(record) / sizeof(uint64_t); ++index) {
+    words[index] = source[index];
+  }
+  const uint32_t lane = task.task_index, cores = task.task_split_num;
+  const uint32_t x = task.inputs[0].input_position, w = task.inputs[1].input_position;
+  const uint32_t y = task.outputs[0].input_position;
+  const uint32_t xs = record.x_scale_position, ws = record.w_scale_position;
+  const uint64_t m = record.tiling.m, n = record.tiling.n, k = record.tiling.k;
+  const uint64_t scale_k = ((k + 63) / 64) * 2;
+  if (xs >= launch->buffer_count || ws >= launch->buffer_count || lane >= cores ||
+      cores > launch->cube_count || (record.output_bytes != 2 && record.output_bytes != 4)) {
+    AscendC::Trap();
+    return;
+  }
+  CheckMxRange(0, m * k, launch->buffer_bytes[x]);
+  CheckMxRange(0, n * k, launch->buffer_bytes[w]);
+  CheckMxRange(0, m * scale_k, launch->buffer_bytes[xs]);
+  CheckMxRange(0, n * scale_k, launch->buffer_bytes[ws]);
+  CheckMxRange(0, m * n * record.output_bytes, launch->buffer_bytes[y]);
+  if (m == 0) return;
+  if (k == 0) {
+    ZeroMxMatrix(m * n * record.output_bytes / sizeof(uint32_t), lane, cores, inputs[y]);
+    return;
+  }
+  using ND = asc::te::nd_ext_layout_ptn;
+  using DN = asc::te::dn_ext_layout_ptn;
+  const auto transpose = record.tiling_key & 0xf;
+  if (transpose == 1 && record.output_bytes == 4) {
+    ExecuteQbmmKernel<float, DN, ND>(record, lane, cores, inputs[x], inputs[w], inputs[xs], inputs[ws], inputs[y]);
+  } else if (transpose == 1 && record.output_bytes == 2) {
+    ExecuteQbmmKernel<bfloat16_t, DN, ND>(
+      record, lane, cores, inputs[x], inputs[w], inputs[xs], inputs[ws], inputs[y]);
+  } else if (transpose == 4 && record.output_bytes == 2) {
+    ExecuteQbmmKernel<bfloat16_t, ND, DN>(
+      record, lane, cores, inputs[x], inputs[w], inputs[xs], inputs[ws], inputs[y]);
+  } else if (transpose == 0 && record.output_bytes == 2) {
+    ExecuteQbmmKernel<bfloat16_t, ND, ND>(
+      record, lane, cores, inputs[x], inputs[w], inputs[xs], inputs[ws], inputs[y]);
+  } else {
+    AscendC::Trap();
+  }
 }
 }  // namespace MulticoreMx
 #endif

@@ -99,8 +99,9 @@ SwiGLU 任务从描述符读取 SiLU 前裁剪阈值，并按专家起点写入�
 [权重绑定](../../hyper_multicore/modules/mega_moe/backends/mxfp8/weights.py)解释，
 不能直接套用 BF16 的 task 数、tiling 或 native 算子参数表。
 
-共享专家用独立的单组 group list 绑定实际本地 token 数，复用现有 NT、NN、TN GEMM
-和双轴量化任务。每个路由专家的最后一个 GEMM 完成后推动本地汇合事件，
+共享专家用独立的单组 group list 绑定双轴量化任务。NT、NN、TN 矩阵乘使用 Dense QBMM
+任务，描述表保存 CANN tiling key 和原始记录，按实际本地 token 数缓存。逻辑 Cube 编号和
+核数采用 Dense tiler 的分配。每个路由专家的最后一个 GEMM 完成后推动本地汇合事件，
 随后计算队列依次执行共享任务，奇数 AIV 的 Combine 队列独立推进。
 共享数据和权重使用现有 native buffer-list 的后续槽位。没有新的对称 payload。
 前向保存共享激活和原始权重根。反向在权重重新物化后用本地 `dY` 计算共享梯度，

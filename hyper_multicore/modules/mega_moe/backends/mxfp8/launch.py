@@ -15,7 +15,7 @@ from .launch_contract import serialize_mx_launch_metadata
 @lru_cache(maxsize=1)
 def _load_mxfp8_native() -> None:
     _load_native()
-    if torch.ops.hyper_multicore.mega_moe_mxfp8_abi_version() != 3:
+    if torch.ops.hyper_multicore.mega_moe_mxfp8_abi_version() != 4:
         raise RuntimeError('MXFP8 MegaMoE adapter ABI mismatch; rebuild the local multicore component.')
 
 

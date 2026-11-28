@@ -1,0 +1,93 @@
+--- a/include/blaze/gemm/block/block_scheduler_qbmm.h
++++ b/include/blaze/gemm/block/block_scheduler_qbmm.h
+@@ -46,7 +46,8 @@
+         int64_t nTailMain;
+     };
+ 
+-    __aicore__ inline BlockSchedulerQuantBatchMatmulV3(const ProblemShape& shape, const Params& params)
++    __aicore__ inline BlockSchedulerQuantBatchMatmulV3(const ProblemShape& shape, const Params& params,
++                                                         uint32_t logicalIdx = 0, uint32_t logicalCount = 0)
+     {
+         const int64_t m = asc::te::get<MNK_M>(shape);
+         const int64_t n = asc::te::get<MNK_N>(shape);
+@@ -55,8 +56,8 @@
+         mBlockNums_ = Blaze::Gemm::CeilDiv(m, baseM_);
+         nBlockNums_ = Blaze::Gemm::CeilDiv(n, baseN_);
+         blockNums_ = mBlockNums_ * nBlockNums_;
+-        blockIdx_ = AscendC::GetBlockIdx() / AscendC::GetTaskRation();
+-        coreNums_ = AscendC::GetBlockNum();
++        blockIdx_ = logicalCount ? logicalIdx : AscendC::GetBlockIdx() / AscendC::GetTaskRation();
++        coreNums_ = logicalCount ? logicalCount : AscendC::GetBlockNum();
+         if (coreNums_ <= 0) {
+             return;
+         }
+--- a/include/blaze/gemm/kernel/kernel_qbmm_mx_without_batch.h
++++ b/include/blaze/gemm/kernel/kernel_qbmm_mx_without_batch.h
+@@ -89,7 +89,10 @@
+         QBMMTiling qbmmParams;
+     };
+ 
+-    __aicore__ inline void operator()(const Params& params) { Run(params); }
++    __aicore__ inline void operator()(const Params& params, uint32_t logicalIdx = 0, uint32_t logicalCount = 0)
++    {
++        Run(params, logicalIdx, logicalCount);
++    }
+ 
+ private:
+     static constexpr bool WEIGHT_NZ = IsWeightNz<LayoutB>::value;
+@@ -108,8 +111,8 @@
+         TRANS_B, asc::te::frame_layout_format<asc::te::scaleb_dn_layout_ptn, AscendC::Std::Int<SCALE_C0>>,
+         asc::te::frame_layout_format<asc::te::scaleb_nd_layout_ptn, AscendC::Std::Int<SCALE_C0>>>;
+ 
+-    __aicore__ inline void Run(const Params& params);
+-    __aicore__ inline void Process(const Params& params, BlockScheduler& bs);
++    __aicore__ inline void Run(const Params& params, uint32_t logicalIdx, uint32_t logicalCount);
++    __aicore__ inline void Process(const Params& params, BlockScheduler& bs, uint32_t coreCount);
+ 
+     // Process one block, keeping Process compact.
+     template <class GmTensorA, class GmTensorB, class GmTensorScaleA, class GmTensorScaleB, class GmTensorBias,
+@@ -134,7 +137,8 @@
+ };
+ 
+ QBMM_MX_WITHOUT_BATCH_KERNEL_CLASS_TEM_PARAMS
+-__aicore__ inline void GemmUniversal<QBMM_MX_WITHOUT_BATCH_KERNEL_TEM_PARAMS>::Run(const Params& params)
++__aicore__ inline void GemmUniversal<QBMM_MX_WITHOUT_BATCH_KERNEL_TEM_PARAMS>::Run(
++    const Params& params, uint32_t logicalIdx, uint32_t logicalCount)
+ {
+     if ASCEND_IS_AIV {
+         return;
+@@ -154,12 +158,12 @@
+         biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
+     }
+ 
+-    BlockScheduler bs(problemShape, params.schParams);
++    BlockScheduler bs(problemShape, params.schParams, logicalIdx, logicalCount);
+ 
+     const BlockShape l0BlockShape{qbmmParams.baseM, qbmmParams.baseN, qbmmParams.baseK, 0};
+     mmadOp_.Init(problemShape, l0BlockShape, params.l1Params, isBias, qbmmParams.dbL0C > 1);
+ 
+-    Process(params, bs);
++    Process(params, bs, logicalCount ? logicalCount : AscendC::GetBlockNum());
+     if constexpr (IS_ATOMIC_ADD) {
+         AscendC::SetAtomicNone();
+     }
+@@ -200,8 +204,8 @@
+ }
+ 
+ QBMM_MX_WITHOUT_BATCH_KERNEL_CLASS_TEM_PARAMS
+-__aicore__ inline void GemmUniversal<QBMM_MX_WITHOUT_BATCH_KERNEL_TEM_PARAMS>::Process(const Params& params,
+-                                                                                       BlockScheduler& bs)
++__aicore__ inline void GemmUniversal<QBMM_MX_WITHOUT_BATCH_KERNEL_TEM_PARAMS>::Process(
++    const Params& params, BlockScheduler& bs, uint32_t coreCount)
+ {
+     const auto& problemShape = params.problemShape;
+     const auto m = asc::te::get<MNK_M>(problemShape);
+@@ -226,7 +230,7 @@
+ 
+     const auto mTailTile = params.schParams.mTailTile;
+     const auto nTailTile = params.schParams.nTailTile;
+-    if ((bs.GetEndBlockIdx() + 1) * mTailTile * nTailTile <= AscendC::GetBlockNum()) {
++    if ((bs.GetEndBlockIdx() + 1) * mTailTile * nTailTile <= coreCount) {
+         bs.UpdateTailTile(mTailTile, nTailTile);
+     }
+ 

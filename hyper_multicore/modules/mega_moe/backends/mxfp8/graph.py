@@ -15,6 +15,9 @@
 """Compose forward/backward expert DAGs from standard MX mathematical tasks."""
 from dataclasses import dataclass, replace
 from typing import Any
+
+import torch
+
 from hyper_multicore.modules.mega_moe.numerics import validate_mxfp8_activation
 from hyper_multicore.scheduler.config import (TaskSplitValue,
     init_task_split_value, configure_ready_handshake, validate_runtime_config, mega_moe_event_capacity)
@@ -51,6 +54,7 @@ class MXFP8Runtime:
     gmm_descriptors: bytes
     quant_descriptors: bytes
     buffer_count: int
+    qbmm_descriptors: bytes = b""
     transport_schedule: str = 'QP1'
     native_operator: str = 'HyperMegaMoeMxfp8'
     shared_buffer_names: tuple[str, ...] = ()
@@ -118,7 +122,9 @@ def _buffer_specs(spec: MegaMoeSpec, forward: bool) -> dict[int, TensorSpec]:
     return result
 
 
-def build_mxfp8_runtime(spec: MegaMoeSpec, *, forward: bool) -> MXFP8Runtime:
+def build_mxfp8_runtime(
+    spec: MegaMoeSpec, *, forward: bool, shared_rows: int | None = None, device: torch.device | None = None,
+) -> MXFP8Runtime:
     """Wire per-expert dependencies; preserve adopted math, transport and task boundaries."""
     activation_parameters = spec.activation_parameters
     validate_mxfp8_activation(activation_parameters)
@@ -162,10 +168,11 @@ def build_mxfp8_runtime(spec: MegaMoeSpec, *, forward: bool) -> MXFP8Runtime:
     for left, right in zip(order, order[1:]):
         graph.add_edge(left, right)
     routed_ops = graph.topological_sort()
-    shared_ops, shared_buffers = (), ()
+    shared_ops, shared_buffers, qbmms = (), (), []
     if spec.shared_intermediate_size is not None:
+        rows = spec.local_num_tokens if shared_rows is None else shared_rows
         shared_ops, shared_buffers = add_shared_expert(
-            graph, spec, forward, specs, specs[gtable], specs[qtable], gmms, quants, clamp_bits,
+            graph, spec, forward, specs, specs[qtable], qbmms, quants, clamp_bits, rows, device=device,
         )
     graph.propagate_splits(values)
     tasks = 1 + sum(op.task_num for op in graph.topological_sort())
@@ -200,4 +207,4 @@ def build_mxfp8_runtime(spec: MegaMoeSpec, *, forward: bool) -> MXFP8Runtime:
     native_operator = 'HyperMegaMoeMxfp8' if forward else 'HyperMegaMoeMxfp8Grad'
     return MXFP8Runtime(graph, cfg, serialize_mx_gmm_descriptors(gmms),
                         serialize_mx_quant_descriptors(quants), len(specs) + len(shared_buffers),
-                        f'{spec.schedule_policy}/QP1', native_operator, shared_buffers)
+                        b"".join(qbmms), f'{spec.schedule_policy}/QP1', native_operator, shared_buffers)

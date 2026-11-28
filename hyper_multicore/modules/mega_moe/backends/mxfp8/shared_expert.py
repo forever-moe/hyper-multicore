@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from hyper_multicore.scheduler.config import ATOMIC_ADD_VALUE_LEN, TaskAiCoreType, TaskDescC, TaskType
 from hyper_multicore.scheduler.graph import OperatorNode, OpType, SplitSpec, TensorSpec
-from hyper_multicore.tasks.gmm_mxfp8 import Mxfp8GmmFillConfig
+from hyper_multicore.tasks.qbmm_mxfp8 import Mxfp8QbmmFillConfig, qbmm_tiling
 from hyper_multicore.tasks.quantization_mxfp8 import (
     MX_QUANT_TASK, MX_SWIGLU_GRAD_TASK, MX_SWIGLU_TASK, Mxfp8QuantFillConfig,
 )
@@ -13,9 +13,25 @@ from hyper_multicore.tasks.swiglu_mxfp8 import Mxfp8SwiGLUFillConfig
 from hyper_multicore.modules.mega_moe.spec import SHARED_EXPERT_EVENTS
 
 
-def add_shared_expert(graph, spec, forward, specs, gmm_table, quant_table, gmms, quants, clamp_bits):
-    """Append one local group using the existing MXFP8 compute operand contracts."""
-    h, width, rows, cubes = spec.hidden_size, spec.shared_intermediate_size, spec.local_num_tokens, spec.num_cube_cores
+def shared_qbmm_problems(rows, hidden, width, grad_bytes, *, forward):
+    if forward:
+        return {
+            "up": ("NT", rows, 2 * width, hidden, 2),
+            "down": ("NT", rows, hidden, width, 2),
+        }
+    return {
+        "dw2": ("TN", hidden, width, rows, grad_bytes),
+        "da": ("NN", rows, width, hidden, 2),
+        "dw1": ("TN", 2 * width, hidden, rows, grad_bytes),
+        "dx": ("NN", rows, hidden, 2 * width, 2),
+    }
+
+
+def add_shared_expert(graph, spec, forward, specs, quant_table, qbmms, quants, clamp_bits, rows, *, device):
+    """Append the local Dense math after the routed expert stages."""
+    h, width, cubes = spec.hidden_size, spec.shared_intermediate_size, spec.num_cube_cores
+    grad_bytes = 4 if spec.partial_weight_grad_dtype == 'float32' else 2
+    problems = shared_qbmm_problems(rows, h, width, grad_bytes, forward=forward)
     buffers = {}
 
     def buffer(name, shape, dtype_size=2):
@@ -41,11 +57,12 @@ def add_shared_expert(graph, spec, forward, specs, gmm_table, quant_table, gmms,
     graph.add_edge('down' if forward else 'dx', ready)
     ops = [ready]
     group = buffer('group', (1,), 8)
+    qbmm = buffer('qbmm', (1,), 1)
 
     def stage(name, kind, inputs, outputs, fill):
         op = OperatorNode(f'shared_{name}', kind, list(inputs), list(outputs),
                           [operand.param_position for operand in (*inputs, *outputs)],
-                          1, SplitSpec(None, lambda _: cubes), -1, fill)
+                          1, SplitSpec(None, lambda _: fill.workers), -1, fill)
         graph.add_op(op)
         graph.add_edge(ops[-1], op)
         ops.append(op)
@@ -57,11 +74,12 @@ def add_shared_expert(graph, spec, forward, specs, gmm_table, quant_table, gmms,
                    MX_SWIGLU_GRAD_TASK: OpType.SWIGLU_GRAD_QUANT}[kind]
         stage(name, op_type, (*inputs, group, quant_table), outputs, fill)
 
-    def gmm(name, layout, dims, lhs, rhs, out):
+    def matmul(name, lhs, rhs, out):
         x, x_scale = lhs
         w, w_scale = rhs
-        fill = Mxfp8GmmFillConfig(layout, *dims, x_scale.param_position, w_scale.param_position, cubes, gmms)
-        stage(name, OpType.GMM, (x, w, group, gmm_table), (out,), fill)
+        key, workers, tiling = qbmm_tiling(*problems[name], cubes, device=device)
+        fill = Mxfp8QbmmFillConfig(key, workers, tiling, x_scale.param_position, w_scale.param_position, qbmms)
+        stage(name, OpType.GMM, (x, w, qbmm), (out,), fill)
 
     def weight(name, out_channels, in_channels):
         shape = (out_channels, in_channels)
@@ -76,9 +94,9 @@ def add_shared_expert(graph, spec, forward, specs, gmm_table, quant_table, gmms,
         source = buffer('x', (rows, h))
         output = buffer('output', (rows, h))
         quant('quant_x', MX_QUANT_TASK, h, (source,), x)
-        gmm('up', 'NT', (rows, 2 * width, h), x[:2], w1, gate_up)
+        matmul('up', x[:2], w1, gate_up)
         quant('swiglu_quant', MX_SWIGLU_TASK, width, (gate_up,), activation)
-        gmm('down', 'NT', (rows, h, width), activation[:2], w2, output)
+        matmul('down', activation[:2], w2, output)
     else:
         dy, du = quantized('dy', h), quantized('du', 2 * width)
         x_col = saved_columns('x', h)
@@ -86,15 +104,14 @@ def add_shared_expert(graph, spec, forward, specs, gmm_table, quant_table, gmms,
         source = buffer('dy', (rows, h))
         da = buffer('da', (rows, width))
         dx = buffer('dx', (rows, h))
-        grad_bytes = 4 if spec.partial_weight_grad_dtype == 'float32' else 2
         dw1 = buffer('dw1', (2 * width, h), grad_bytes)
         dw2 = buffer('dw2', (h, width), grad_bytes)
         quant('quant_dy', MX_QUANT_TASK, h, (source,), dy)
-        gmm('dw2', 'TN', (h, width, rows), dy[2:], a_col, dw2)
-        gmm('da', 'NN', (rows, width, h), dy[:2], w2, da)
+        matmul('dw2', dy[2:], a_col, dw2)
+        matmul('da', dy[:2], w2, da)
         quant('swiglu_grad_quant', MX_SWIGLU_GRAD_TASK, 2 * width, (gate_up, da), du)
-        gmm('dw1', 'TN', (2 * width, h, rows), du[2:], x_col, dw1)
-        gmm('dx', 'NN', (rows, h, 2 * width), du[:2], w1, dx)
+        matmul('dw1', du[2:], x_col, dw1)
+        matmul('dx', du[:2], w1, dx)
     return ops, tuple(buffers)
 
 

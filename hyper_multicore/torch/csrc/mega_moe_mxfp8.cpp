@@ -38,7 +38,7 @@ TORCH_LIBRARY_FRAGMENT(hyper_multicore, m) {
         "Tensor(d!) diagnostic, Tensor launch_metadata) -> ()");
   m.def("mega_moe_mxfp8_grad(Tensor(a!)[] buffers, Tensor(b!) runtime_config, Tensor(c!) events, "
         "Tensor(d!) diagnostic, Tensor launch_metadata) -> ()");
-  m.def("mega_moe_mxfp8_abi_version() -> int", []() -> int64_t { return 3; });
+  m.def("mega_moe_mxfp8_abi_version() -> int", []() -> int64_t { return 4; });
 }
 TORCH_LIBRARY_IMPL(hyper_multicore, PrivateUse1, m) {
   m.impl("mega_moe_mxfp8", &MegaMoeMxfp8);

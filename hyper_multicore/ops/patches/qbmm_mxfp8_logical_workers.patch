@@ -1,0 +1,38 @@
+--- a/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_without_batch_tensor_api_blaze.h
++++ b/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_without_batch_tensor_api_blaze.h
+@@ -22,7 +22,8 @@
+ template <class A_TYPE, class B_TYPE, class C_TYPE, class aLayout, class bLayout, class cLayout,
+           uint64_t FULL_LOAD_MODE = 0>
+ __aicore__ inline void QbmmMxWithoutBatchTensorApiKernel(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR scale, GM_ADDR bias,
+-                                                         GM_ADDR perTokenScale, GM_ADDR cGM, const void* tilingData)
++                                                         GM_ADDR perTokenScale, GM_ADDR cGM, const void* tilingData, uint32_t logicalIdx = 0,
++                                                                    uint32_t logicalCount = 0)
+ {
+     using AType = A_TYPE;
+     using BType = B_TYPE;
+@@ -53,5 +54,5 @@
+                 quantBmmTilingData.nTailTile, quantBmmTilingData.mBaseTailSplitCnt,
+                 quantBmmTilingData.nBaseTailSplitCnt, quantBmmTilingData.mTailMain, quantBmmTilingData.nTailMain},
+                {quantBmmTilingData.baseM, quantBmmTilingData.baseN, quantBmmTilingData.baseK, quantBmmTilingData.isBias,
+-                quantBmmTilingData.dbL0C, quantBmmTilingData.weightMustHitL2}});
++                quantBmmTilingData.dbL0C, quantBmmTilingData.weightMustHitL2}}, logicalIdx, logicalCount);
+ }
+--- a/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_l0c_pingpong.h
++++ b/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_l0c_pingpong.h
+@@ -81,7 +81,8 @@
+           uint64_t FULL_LOAD_MODE = 0>
+ __aicore__ inline void QbmmMxL0CPingpongWithoutBatchTensorApiKernel(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR scale,
+                                                                     GM_ADDR bias, GM_ADDR perTokenScale, GM_ADDR cGM,
+-                                                                    const void* tilingData)
++                                                                    const void* tilingData, uint32_t logicalIdx = 0,
++                                                                    uint32_t logicalCount = 0)
+ {
+     using AType = A_TYPE;
+     using BType = B_TYPE;
+@@ -112,5 +113,5 @@
+                 quantBmmTilingData.nTailTile, quantBmmTilingData.mBaseTailSplitCnt,
+                 quantBmmTilingData.nBaseTailSplitCnt, quantBmmTilingData.mTailMain, quantBmmTilingData.nTailMain},
+                {quantBmmTilingData.baseM, quantBmmTilingData.baseN, quantBmmTilingData.baseK, quantBmmTilingData.isBias,
+-                quantBmmTilingData.dbL0C, quantBmmTilingData.weightMustHitL2}});
++                quantBmmTilingData.dbL0C, quantBmmTilingData.weightMustHitL2}}, logicalIdx, logicalCount);
+ }

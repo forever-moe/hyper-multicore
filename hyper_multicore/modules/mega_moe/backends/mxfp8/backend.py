@@ -6,12 +6,15 @@ from functools import cached_property
 
 import torch
 
+from hyper_multicore._core_spec import get_device_core_spec
 from hyper_multicore.scheduler.runtime import serialize_runtime_config
+from hyper_multicore.tasks.qbmm_mxfp8 import qbmm_tiling
 from ...resources import _MegaMoeExecutionResources
 from .diagnostics import prepare_mx_diagnostics
 from .execution import MXFP8Execution
 from .autograd import execute_mxfp8_experts
 from .graph import build_mxfp8_runtime
+from .shared_expert import shared_qbmm_problems
 from .weights import MXFP8ExpertWeightBinding
 
 
@@ -25,6 +28,7 @@ class _DeviceRuntime:
     runtime: torch.Tensor
     gmm: torch.Tensor
     quant: torch.Tensor
+    qbmm: torch.Tensor | None
     event_capacity: int
     host: object
     spec: object
@@ -38,7 +42,9 @@ class _DeviceRuntime:
 def _device_runtime(host, device, spec):
     return _DeviceRuntime(_device_bytes(serialize_runtime_config(host.config), device),
                           _device_bytes(host.gmm_descriptors, device),
-                          _device_bytes(host.quant_descriptors, device), host.config.event_capacity, host, spec)
+                          _device_bytes(host.quant_descriptors, device),
+                          _device_bytes(host.qbmm_descriptors, device) if host.qbmm_descriptors else None,
+                          host.config.event_capacity, host, spec)
 
 
 @dataclass(frozen=True)
@@ -62,7 +68,7 @@ class Resources(_MegaMoeExecutionResources):
         if self.spec.architecture != 3510:
             raise ValueError("MXFP8 experts require arch35")
 
-    def plan_for_capacity(self, capacity, device, *, tokens=None):
+    def plan_for_capacity(self, capacity, device, *, tokens=None, shared_rows=None):
         """Cache pointer-free Pull plans independently of the live per-expert loads."""
         coverage = self.spec.local_num_tokens if tokens is None else tokens
         if coverage > self._token_capacity:
@@ -73,12 +79,16 @@ class Resources(_MegaMoeExecutionResources):
             if not 1 <= capacity <= limit:
                 raise ValueError(f"Pull receive capacity must be in [1, {limit}]")
             capacity = limit
-        key = (coverage, capacity)
+        key = (coverage, capacity, shared_rows)
         if key not in self._plans:
             spec = replace(active_spec, receive_capacity=capacity)
             self._plans[key] = _MXFP8Plan(
-                spec, _device_runtime(build_mxfp8_runtime(spec, forward=True), device, spec),
-                _device_runtime(build_mxfp8_runtime(spec, forward=False), device, spec))
+                spec,
+                _device_runtime(build_mxfp8_runtime(spec, forward=True, shared_rows=shared_rows, device=device),
+                                device, spec),
+                _device_runtime(build_mxfp8_runtime(spec, forward=False, shared_rows=shared_rows, device=device),
+                                device, spec),
+            )
         self._plans.move_to_end(key)
         while len(self._plans) > 4:
             self._plans.popitem(last=False)
@@ -106,6 +116,16 @@ def validate_shared_weights(module, weights, hidden):
         if root.device != hidden.device:
             raise ValueError("MX shared expert weights and hidden states must share a device")
         MXFP8ExpertWeightBinding(root, (1, *shape), forward_axis="row").resolve("forward")
+
+
+def validate_shared_tiling(hidden, width, partial_grad_dtype):
+    """Ask the tiler before EP agreement, so an unsupported local shape rejects all ranks."""
+    rows, h = hidden.shape
+    cubes = get_device_core_spec(hidden.device.index).num_cube_cores
+    grad_bytes = 4 if partial_grad_dtype == "float32" else 2
+    for forward in (True, False):
+        for shape in shared_qbmm_problems(rows, h, width, grad_bytes, forward=forward).values():
+            qbmm_tiling(*shape, cubes, device=hidden.device)
 
 
 def forward(module, hidden_states, hidden_flat, topk_ids, topk_weights, weights, resources, route,

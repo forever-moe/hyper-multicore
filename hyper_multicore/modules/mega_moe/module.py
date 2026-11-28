@@ -19,6 +19,7 @@ from __future__ import annotations
 __all__ = ["MegaMoeExperts"]
 
 from collections.abc import Mapping
+import logging
 from typing import Any
 
 import torch
@@ -42,6 +43,8 @@ from .spec import (
 from .placement_options import MegaMoePlacementOptions
 from .transport import requested_transport
 from .schedule import validate_schedule_options
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class _InvalidExpertWeights(ValueError):
@@ -480,7 +483,14 @@ class MegaMoeExperts(MulticoreModule):
             if shared_expert_weights is not None:
                 try:
                     self._backend.validate_shared_weights(self, shared_expert_weights, hidden_flat)
-                except (AttributeError, TypeError, ValueError, RuntimeError) as error:
+                    if self.ep_size > 1:
+                        self._backend.validate_shared_tiling(
+                            hidden_flat, self.shared_intermediate_size,
+                            self._resource_group.specification["partial_weight_grad_dtype"],
+                        )
+                except (AttributeError, ImportError, OSError, TypeError, ValueError, RuntimeError) as error:
+                    if self.ep_size > 1:
+                        _LOGGER.exception("MegaMoE shared expert setup failed on %s", hidden_flat.device)
                     raise _InvalidExpertWeights(str(error)) from error
             return hidden_flat, False
         except (_InvalidExpertWeights, _InvalidExpertWeightType):

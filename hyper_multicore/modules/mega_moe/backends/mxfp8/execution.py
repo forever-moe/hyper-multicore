@@ -111,7 +111,8 @@ class MXFP8Execution:
         metadata = route.metadata
         pull = spec.dispatch_mode == "pull"
         capacity = metadata.expert_capacity if pull else workspace.expert_capacity
-        plan = resources.plan_for_capacity(capacity, device, tokens=metadata.plan_tokens)
+        shared_rows = hidden.numel() // spec.hidden_size if shared_weights is not None else None
+        plan = resources.plan_for_capacity(capacity, device, tokens=metadata.plan_tokens, shared_rows=shared_rows)
         if pull:
             dispatch_buffer = torch.empty((capacity, spec.hidden_size), dtype=torch.bfloat16, device=device)
             source_buffer = workspace.source_buffer
@@ -138,6 +139,7 @@ class MXFP8Execution:
             shared = None
             if shared_weights is not None:
                 shared = _shared_forward_buffers(hidden, spec.shared_intermediate_size, *shared_weights)
+                shared['qbmm'] = plan.forward.qbmm
                 buffers.extend(shared[name] for name in plan.forward.host.shared_buffer_names)
             events = workspace.prepare_event_counters(forward=True)
             self._launch(buffers, plan.forward, events, plan)
@@ -214,6 +216,7 @@ class MXFP8Execution:
                 shared = _shared_backward_buffers(
                     dy, spec.shared_intermediate_size, partial_dtype, shared_saved, *shared_weights,
                 )
+                shared['qbmm'] = plan.backward.qbmm
                 buffers.extend(shared[name] for name in plan.backward.host.shared_buffer_names)
             events = workspace.prepare_event_counters(forward=False)
             self._launch(buffers, plan.backward, events, plan, direction="backward")

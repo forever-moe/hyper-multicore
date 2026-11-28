@@ -35,6 +35,8 @@ class MxTaskWorker : public KernelWorkerBase<MxTaskWorker, VectorWorkerPolicy::A
       case 10: break;
 #ifdef __DAV_CUBE__
       case 142: MulticoreMx::ExecuteMxGmmTask(task, input_list, launch); break;
+      case static_cast<uint32_t>(TaskType::TASK_MX_QBMM):
+        MulticoreMx::ExecuteMxQbmmTask(task, input_list, launch); break;
 #else
       case 143:
       case 145:

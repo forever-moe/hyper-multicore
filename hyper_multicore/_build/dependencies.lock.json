@@ -77,6 +77,14 @@
                 "path": "hyper_multicore/ops/patches/mx_quant_logical_workers.patch",
                 "sha256": "bfdcbabe9e296a01d4d577e143414ee10dd1cdc00034aa45944327937a7afc96",
                 "purpose": "bind task-local vector worker indices for dynamic MX quantization and SwiGLU GroupQuant"
+              },
+              {
+                "path": "hyper_multicore/ops/patches/qbmm_mxfp8_logical_workers.patch",
+                "sha256": "230444c744e16a254758a7eb053dfdd13a6389479a7ecac567da5a16eac0bac9",
+                "purpose": "Use task-local Cube indices and counts in the standard dense MXFP8 QBMM",
+                "architectures": [
+                  "arch35"
+                ]
               }
             ],
             "upgrade_policy": "compare row and column data and scales against the CANN operators before upgrading",
@@ -192,6 +200,14 @@
             "path": "hyper_multicore/ops/patches/blaze_gmm_logical_workers.patch",
             "sha256": "76cd743f4ce1f41cdde5ae1ba8953a32d2535f58f64dcaaa6a56821bd3fd9f36",
             "purpose": "BF16 and MXFP8 GMM task-local entry and logical-worker binding for arch35; standard mathematics unchanged",
+            "architectures": [
+              "arch35"
+            ]
+          },
+          {
+            "path": "hyper_multicore/ops/patches/blaze_qbmm_logical_workers.patch",
+            "sha256": "e597ddee5d5be674dc169257fb820082a2b345de08022384ba4bb1473a02df48",
+            "purpose": "Use task-local Cube indices and counts in the standard dense MXFP8 QBMM",
             "architectures": [
               "arch35"
             ]
